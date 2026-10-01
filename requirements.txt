@@ -1,0 +1,27 @@
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+
+# Faz as requisições "de busca rápida" imitarem o footprint de um Chrome de
+# verdade (TLS/HTTP), o que evita boa parte dos bloqueios 403 que a
+# biblioteca requests sozinha toma em lojas com proteção anti-robô.
+# Altamente recomendado — sem ele, o scraper pula direto para a camada mais
+# lenta (requests simples / Selenium).
+curl_cffi>=0.7.0
+
+# Usado como último recurso quando as camadas acima são bloqueadas, e é
+# obrigatório para a KaBuM! (que monta a lista de produtos via JavaScript).
+# Requer o Google Chrome instalado; o próprio Selenium (4.6+) baixa e
+# gerencia o driver sozinho.
+selenium>=4.20.0
+
+# Gráfico de variação de preço na tela de histórico.
+matplotlib>=3.8.0
+
+# Melhorias opcionais com LLM (filtro de relevância, leitura de preço quando
+# o site muda, busca em linguagem natural) — veja llm_config.py. Só é usado
+# se LLM_ATIVADO estiver True lá.
+openai>=1.0.0
+
+# Ícone na bandeja do sistema (perto do relógio) — fechar no X minimiza pra
+# lá em vez de encerrar o programa.
+pystray>=0.19.0

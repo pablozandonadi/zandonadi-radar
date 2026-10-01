@@ -1,0 +1,22 @@
+# Credenciais e dados pessoais - nunca vao pro repositorio publico
+llm_config.py
+email_config.py
+precos.db
+rotinas.log
+
+# Instalador gerado (binario grande - fica nas GitHub Releases, nao no repo)
+ZandonadiRadarSetup.exe
+*.exe
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+build/
+dist/
+*.spec
+
+# Editor/OS
+.vscode/
+Thumbs.db
+desktop.ini
