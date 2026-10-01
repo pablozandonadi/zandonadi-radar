@@ -27,12 +27,14 @@ from tkinter import messagebox, simpledialog, ttk
 if getattr(sys, "frozen", False):
     sys.path.insert(0, os.path.dirname(sys.executable))
 
+import atualizacoes
 import database as db
 import llm
 import notificacoes
 import rotinas as rotinas_mod
 from config import (
     BASE_DIR, CATEGORIAS, LOJAS_DISPONIVEIS, LOJAS_ELETRO_MOVEIS, ORDEM_CATEGORIAS, ORDEM_CATEGORIAS_CASA,
+    VERSAO_APP,
 )
 from scraper import buscar_em_todas_as_lojas, buscar_produto_por_url
 
@@ -381,6 +383,63 @@ class RastreadorApp(tk.Tk):
         self._montar_layout()
         self.mostrar_boas_vindas()
         self.after(5000, self._checar_rotinas_em_segundo_plano)
+        self.after(3000, self._checar_atualizacao_em_segundo_plano)
+
+    def _checar_atualizacao_em_segundo_plano(self):
+        """Checa 1x por abertura do app se tem versão nova no GitHub (ver
+        atualizacoes.py). Silencioso — se não tiver internet ou já estiver
+        atualizado, não aparece nada."""
+        def trabalho():
+            info = atualizacoes.verificar_atualizacao()
+            if info:
+                self.fila_eventos.put(lambda: self._avisar_atualizacao_disponivel(info))
+
+        threading.Thread(target=trabalho, daemon=True).start()
+
+    def _avisar_atualizacao_disponivel(self, info):
+        if not messagebox.askyesno(
+            "Nova versão disponível!",
+            f"Tem uma versão nova do Zandonadi Radar: {info['versao']} "
+            f"(você está na {VERSAO_APP}).\n\n"
+            f"{info['notas'][:300]}\n\n"
+            "Baixar e instalar agora? O programa vai fechar durante a instalação.",
+        ):
+            return
+
+        janela = tk.Toplevel(self, bg=COR_FUNDO)
+        janela.title("Baixando atualização...")
+        janela.geometry("380x130")
+        janela.resizable(False, False)
+        status_var = tk.StringVar(value="Baixando...")
+        tk.Label(janela, textvariable=status_var, bg=COR_FUNDO, fg=COR_TEXTO, pady=10).pack()
+        barra = ttk.Progressbar(janela, mode="determinate", maximum=100)
+        barra.pack(fill="x", padx=20, pady=10)
+
+        def progresso(pct):
+            self.fila_eventos.put(lambda: (barra.config(value=pct), status_var.set(f"Baixando... {pct}%")))
+
+        def trabalho():
+            caminho = atualizacoes.baixar_instalador(info["url_instalador"], callback_progresso=progresso)
+
+            def finalizar():
+                janela.destroy()
+                if not caminho:
+                    messagebox.showerror(
+                        "Falha no download",
+                        f"Não consegui baixar a atualização agora. Baixe manualmente em:\n{info['url_release']}",
+                    )
+                    return
+                try:
+                    subprocess.Popen([caminho])
+                except Exception as e:
+                    messagebox.showerror("Erro ao abrir o instalador", str(e))
+                    return
+                self.destroy()
+                os._exit(0)
+
+            self.fila_eventos.put(finalizar)
+
+        threading.Thread(target=trabalho, daemon=True).start()
 
     def _checar_rotinas_em_segundo_plano(self):
         """
