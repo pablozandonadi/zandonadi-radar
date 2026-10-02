@@ -1,9 +1,32 @@
-# Rastreador de Preços — Black Friday
+# Zandonadi Radar
 
-App de desktop (Python + Tkinter) para acompanhar preços de peças de PC e
+App de desktop (Windows) para acompanhar preços de peças de PC e
 eletrônicos em várias lojas, guardar histórico, mostrar se um preço já foi
 mais barato/mais caro, e montar um "PC" somando peças de categorias
 diferentes.
+
+## ⬇️ Baixar e instalar (pra quem só quer usar o programa)
+
+**[📥 Baixar o instalador (ZandonadiRadarSetup.exe)](https://github.com/pablozandonadi/zandonadi-radar/releases/latest/download/ZandonadiRadarSetup.exe)**
+
+Esse link já baixa o instalador direto, sempre da versão mais recente —
+**não precisa instalar Python, nem abrir terminal, nem mexer em código**.
+Só executar o `.exe` baixado e seguir a tela de instalação (ela já pergunta
+se você quer configurar a chave da OpenAI e o e-mail de alertas na hora,
+com um guia em PDF explicando como conseguir os dois).
+
+> ⚠️ Não use o botão verde **"Code" → "Download ZIP"** desta página — isso
+> baixa só o código-fonte (pra quem quer programar/alterar o app), não o
+> instalador. O link acima, ou a aba **[Releases](../../releases)**, é o
+> caminho certo pra instalar.
+
+Pré-requisito: o **Google Chrome** precisa já estar instalado no computador
+(usado como reforço contra bloqueio anti-robô nas buscas).
+
+O programa confere sozinho, toda vez que abre, se saiu uma versão nova
+aqui no GitHub — e avisa, com um clique pra atualizar.
+
+---
 
 ## O que ele faz
 
@@ -25,7 +48,7 @@ diferentes.
   mostra se o PC completo ficou mais barato ou mais caro que da última vez
   (mesmo esquema verde/vermelho).
 
-## 1. Instalação
+## Rodando a partir do código-fonte (pra quem quer programar/alterar o app)
 
 Você precisa do **Python 3.10+** instalado (verifique com `python --version`
 no terminal do VSCode).
