@@ -26,6 +26,23 @@ Pré-requisito: o **Google Chrome** precisa já estar instalado no computador
 O programa confere sozinho, toda vez que abre, se saiu uma versão nova
 aqui no GitHub — e avisa, com um clique pra atualizar.
 
+### ⚠️ O Windows pode avisar/bloquear na instalação
+
+O instalador não tem assinatura digital (certificado pago de desenvolvedor),
+então o Windows ainda não "conhece" ele. Duas coisas podem acontecer:
+
+- **Tela azul "O Windows protegeu o computador"** (SmartScreen, o mais comum):
+  clique em **"Mais informações"** e depois em **"Executar assim mesmo"**.
+- **Mensagem "O Controle de Aplicativos Inteligente bloqueou"** (menos comum,
+  só em algumas instalações do Windows 11): essa é mais rígida e não tem
+  botão de exceção. Pra instalar mesmo assim, é preciso desativar em
+  **Segurança do Windows → Controle de aplicativos e navegador → Controle
+  de Aplicativos Inteligente**. Atenção: depois de desativado, o Windows
+  não deixa reativar sem reinstalar o sistema — é uma decisão de mão única.
+
+Isso acontece com qualquer programa novo de desenvolvedor independente sem
+certificado pago, não é um problema específico deste app.
+
 ---
 
 ## O que ele faz
