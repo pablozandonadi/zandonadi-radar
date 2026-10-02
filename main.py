@@ -6,6 +6,7 @@ Ponto de entrada da aplicação (interface gráfica em Tkinter).
 Rode com:  python main.py
 """
 
+import json
 import os
 import queue
 import subprocess
@@ -16,7 +17,7 @@ import tkinter as tk
 import tkinter.font as tkfont
 import webbrowser
 from datetime import datetime, timedelta
-from tkinter import messagebox, simpledialog, ttk
+from tkinter import filedialog, messagebox, simpledialog, ttk
 
 # Rodando como .exe congelado (instalado via o instalador): llm_config.py e
 # email_config.py ficam de fora do pacote de propósito (continuam editáveis
@@ -596,6 +597,7 @@ class RastreadorApp(tk.Tk):
         self._botao_sidebar("🔗  Adicionar por link", self.mostrar_adicionar_link, destaque=True)
         self._botao_sidebar("🛠️  Montar PC", self.mostrar_montagem, destaque=True)
         self._botao_sidebar("⏰  Rotinas", self.mostrar_rotinas, destaque=True)
+        self._botao_sidebar("⚙️  Configurações", self.mostrar_configuracoes, destaque=True)
 
         tk.Frame(self.sidebar, bg=COR_SIDEBAR_DIVISOR, height=1).pack(fill="x", padx=10, pady=8)
 
@@ -2540,6 +2542,183 @@ class RastreadorApp(tk.Tk):
             self.mostrar_rotinas()
 
         criar_botao(rodape, "Salvar alterações" if editando else "Criar rotina", salvar, estilo="primario").pack()
+
+    # ==================================================================
+    # TELA: Configurações (exportar/importar dados)
+    # ==================================================================
+    def mostrar_configuracoes(self):
+        self._limpar_conteudo()
+        self._tela_ativa = "configuracoes"
+        frame = self.area_conteudo
+
+        topo = tk.Frame(frame, bg=COR_FUNDO)
+        topo.pack(fill="x", padx=20, pady=(18, 10))
+        tk.Label(
+            topo, text="⚙️ Configurações", font=(FONTE_TITULO, 22, "bold"), bg=COR_FUNDO, fg=COR_TEXTO
+        ).pack(side="left")
+
+        # --- Exportar ---
+        card_exportar = tk.Frame(frame, bg=COR_CARD_BG, highlightbackground=COR_CARD_BORDA, highlightthickness=1)
+        card_exportar.pack(fill="x", padx=20, pady=(6, 10))
+        tk.Label(
+            card_exportar, text="📤 Exportar dados", font=("Segoe UI", 13, "bold"), bg=COR_CARD_BG, fg=COR_TEXTO,
+        ).pack(anchor="w", padx=16, pady=(14, 4))
+        tk.Label(
+            card_exportar,
+            text="Salva seus produtos, histórico de preços e PCs montados num arquivo — pra guardar de "
+                 "backup ou levar pra outro computador.",
+            bg=COR_CARD_BG, fg=COR_TEXTO_MUTED, wraplength=600, justify="left",
+        ).pack(anchor="w", padx=16)
+
+        opcoes_export = [("__tudo__", "Tudo (todos os produtos, histórico e PCs montados)")] + [
+            (chave, CATEGORIAS[chave]) for chave in (ORDEM_CATEGORIAS + ORDEM_CATEGORIAS_CASA)
+        ]
+        combo_export = ttk.Combobox(
+            card_exportar, values=[rotulo for _, rotulo in opcoes_export], state="readonly", width=50
+        )
+        combo_export.current(0)
+        combo_export.pack(anchor="w", padx=16, pady=(10, 4))
+
+        def exportar():
+            chave, _rotulo = opcoes_export[combo_export.current()]
+            categoria = None if chave == "__tudo__" else chave
+
+            caminho = filedialog.asksaveasfilename(
+                title="Exportar dados", defaultextension=".json",
+                filetypes=[("Zandonadi Radar (*.json)", "*.json")],
+                initialfile=f"zandonadi-radar-{chave if categoria else 'tudo'}.json",
+            )
+            if not caminho:
+                return
+            dados = db.exportar_dados(categoria)
+            try:
+                with open(caminho, "w", encoding="utf-8") as f:
+                    json.dump(dados, f, ensure_ascii=False, indent=2)
+            except OSError as e:
+                messagebox.showerror("Erro ao salvar", str(e))
+                return
+
+            resumo = f"{len(dados['produtos'])} produto(s) exportado(s)."
+            if not categoria and dados["builds"]:
+                resumo += f"\n{len(dados['builds'])} PC(s) montado(s) incluído(s)."
+            messagebox.showinfo("Exportado!", f"{resumo}\n\nArquivo salvo em:\n{caminho}")
+
+        criar_botao(card_exportar, "💾 Exportar...", exportar, estilo="primario").pack(
+            anchor="w", padx=16, pady=(4, 16)
+        )
+
+        # --- Importar ---
+        card_importar = tk.Frame(frame, bg=COR_CARD_BG, highlightbackground=COR_CARD_BORDA, highlightthickness=1)
+        card_importar.pack(fill="x", padx=20, pady=(0, 10))
+        tk.Label(
+            card_importar, text="📥 Importar dados", font=("Segoe UI", 13, "bold"), bg=COR_CARD_BG, fg=COR_TEXTO,
+        ).pack(anchor="w", padx=16, pady=(14, 4))
+        tk.Label(
+            card_importar,
+            text="Lê um arquivo exportado daqui (seu ou de outra pessoa) e traz os produtos pra sua lista.",
+            bg=COR_CARD_BG, fg=COR_TEXTO_MUTED, wraplength=600, justify="left",
+        ).pack(anchor="w", padx=16, pady=(0, 10))
+        criar_botao(
+            card_importar, "📂 Importar arquivo...", self._importar_dados_dialog, estilo="secundario"
+        ).pack(anchor="w", padx=16, pady=(0, 16))
+
+    def _importar_dados_dialog(self):
+        caminho = filedialog.askopenfilename(
+            title="Importar dados",
+            filetypes=[("Zandonadi Radar (*.json)", "*.json"), ("Todos os arquivos", "*.*")],
+        )
+        if not caminho:
+            return
+        try:
+            with open(caminho, "r", encoding="utf-8") as f:
+                dados = json.load(f)
+        except (OSError, json.JSONDecodeError) as e:
+            messagebox.showerror("Erro ao ler o arquivo", str(e))
+            return
+
+        if not isinstance(dados, dict) or dados.get("formato") != db.FORMATO_EXPORTACAO:
+            messagebox.showerror(
+                "Arquivo inválido", "Esse arquivo não parece ser uma exportação do Zandonadi Radar."
+            )
+            return
+
+        qtd_produtos = len(dados.get("produtos", []))
+        qtd_builds = len(dados.get("builds", []))
+        resumo = f"{qtd_produtos} produto(s)" + (f" e {qtd_builds} PC(s) montado(s)" if qtd_builds else "")
+
+        modo = self._perguntar_modo_importacao(resumo)
+        if modo is None:
+            return
+
+        novos_produtos, novos_builds = db.importar_dados(dados, substituir=(modo == "substituir"))
+        messagebox.showinfo(
+            "Importado!",
+            f"{novos_produtos} produto(s) e {novos_builds} PC(s) montado(s) importados com sucesso.",
+        )
+        if self._tela_ativa == "configuracoes":
+            self.mostrar_configuracoes()
+
+    def _perguntar_modo_importacao(self, resumo):
+        """Diálogo modal: 'somar' (entra como novo, sem mexer no resto),
+        'substituir' (apaga tudo que já existe e fica só com o do arquivo),
+        ou None se a pessoa cancelar. Bloqueia até a pessoa escolher."""
+        resultado = {"modo": None}
+        janela = tk.Toplevel(self, bg=COR_FUNDO)
+        janela.title("Como importar?")
+        janela.geometry("440x300")
+        janela.resizable(False, False)
+        janela.grab_set()
+
+        tk.Label(
+            janela, text=f"O arquivo tem {resumo}.", font=("Segoe UI", 11, "bold"),
+            bg=COR_FUNDO, fg=COR_TEXTO, wraplength=400, justify="left",
+        ).pack(anchor="w", padx=16, pady=(16, 10))
+
+        modo_var = tk.StringVar(value="somar")
+        tk.Radiobutton(
+            janela, text="Somar aos que já tenho", value="somar", variable=modo_var,
+            bg=COR_FUNDO, fg=COR_TEXTO, selectcolor=COR_CARD_BG, activebackground=COR_FUNDO,
+            activeforeground=COR_TEXTO, highlightthickness=0, anchor="w", font=("Segoe UI", 10, "bold"),
+        ).pack(anchor="w", padx=16, pady=(6, 0))
+        tk.Label(
+            janela, text="Os itens do arquivo entram como novos, sem mexer no que você já tem cadastrado.",
+            bg=COR_FUNDO, fg=COR_TEXTO_MUTED, wraplength=380, justify="left",
+        ).pack(anchor="w", padx=36, pady=(0, 10))
+
+        tk.Radiobutton(
+            janela, text="Substituir tudo que eu tenho", value="substituir", variable=modo_var,
+            bg=COR_FUNDO, fg=COR_TEXTO, selectcolor=COR_CARD_BG, activebackground=COR_FUNDO,
+            activeforeground=COR_TEXTO, highlightthickness=0, anchor="w", font=("Segoe UI", 10, "bold"),
+        ).pack(anchor="w", padx=16)
+        tk.Label(
+            janela,
+            text="⚠️ Apaga TODOS os seus produtos, histórico e PCs montados atuais — depois disso, "
+                 "fica só com o que veio do arquivo.",
+            bg=COR_FUNDO, fg=COR_VERMELHO, wraplength=380, justify="left",
+        ).pack(anchor="w", padx=36, pady=(0, 10))
+
+        def confirmar():
+            modo_escolhido = modo_var.get()
+            if modo_escolhido == "substituir" and not messagebox.askyesno(
+                "Confirmar substituição",
+                "Tem certeza? Isso vai apagar TUDO que você tem cadastrado agora e não tem como desfazer.",
+                parent=janela,
+            ):
+                return
+            resultado["modo"] = modo_escolhido
+            janela.destroy()
+
+        def cancelar():
+            janela.destroy()
+
+        rodape = tk.Frame(janela, bg=COR_FUNDO)
+        rodape.pack(side="bottom", fill="x", pady=16)
+        criar_botao(rodape, "Cancelar", cancelar, estilo="secundario").pack(side="left", padx=(16, 8))
+        criar_botao(rodape, "Importar", confirmar, estilo="primario").pack(side="left")
+
+        janela.protocol("WM_DELETE_WINDOW", cancelar)
+        self.wait_window(janela)
+        return resultado["modo"]
 
 
 def main():

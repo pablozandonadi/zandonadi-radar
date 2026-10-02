@@ -560,3 +560,133 @@ def registrar_execucao_rotina(rotina_id, quando=None, horario=None):
     )
     conn.commit()
     conn.close()
+
+
+# --------------------------------------------------------------------------
+# Exportar / importar dados (produtos, histórico de preços e PCs montados)
+# --------------------------------------------------------------------------
+
+FORMATO_EXPORTACAO = "zandonadi-radar-export"
+VERSAO_FORMATO_EXPORTACAO = 1
+
+
+def exportar_dados(categoria=None):
+    """
+    Devolve um dict pronto pra salvar em JSON com os produtos (e preços
+    registrados) de uma categoria, ou de tudo (e, nesse caso, também os
+    PCs montados) quando `categoria` é None. Rotinas e credenciais (chave
+    da OpenAI, senha de e-mail) nunca entram aqui — são configuração da
+    máquina, não dados pra levar de um lugar pro outro.
+    """
+    conn = conectar()
+    cur = conn.cursor()
+
+    if categoria:
+        cur.execute("SELECT * FROM produtos WHERE categoria = ?", (categoria,))
+    else:
+        cur.execute("SELECT * FROM produtos")
+    produtos = [dict(l) for l in cur.fetchall()]
+
+    precos = []
+    ids_produtos = [p["id"] for p in produtos]
+    if ids_produtos:
+        marcadores = ",".join("?" * len(ids_produtos))
+        cur.execute(f"SELECT * FROM precos WHERE produto_id IN ({marcadores})", ids_produtos)
+        precos = [dict(l) for l in cur.fetchall()]
+
+    builds, build_itens, build_totais = [], [], []
+    if not categoria:
+        cur.execute("SELECT * FROM builds")
+        builds = [dict(l) for l in cur.fetchall()]
+        cur.execute("SELECT * FROM build_itens")
+        build_itens = [dict(l) for l in cur.fetchall()]
+        cur.execute("SELECT * FROM build_totais")
+        build_totais = [dict(l) for l in cur.fetchall()]
+
+    conn.close()
+    return {
+        "formato": FORMATO_EXPORTACAO,
+        "versao_formato": VERSAO_FORMATO_EXPORTACAO,
+        "exportado_em": _agora(),
+        "categoria_unica": categoria,
+        "produtos": produtos,
+        "precos": precos,
+        "builds": builds,
+        "build_itens": build_itens,
+        "build_totais": build_totais,
+    }
+
+
+def importar_dados(dados, substituir=False):
+    """
+    Importa um dict no formato de `exportar_dados`. `substituir`=True apaga
+    TUDO que já existe antes (produtos, preços, PCs montados) — o resultado
+    final fica só com o que veio do arquivo. `substituir`=False soma aos
+    dados que já existem — cada item do arquivo entra como um produto (ou
+    PC) novo, sem mexer no que já estava lá (mesmo que pareça repetido).
+
+    IDs do arquivo não são reaproveitados (evita colidir com IDs que já
+    existem no banco) — são remapeados pra novos IDs na hora de inserir.
+
+    Retorna (qtd_produtos_importados, qtd_builds_importados).
+    """
+    conn = conectar()
+    cur = conn.cursor()
+
+    if substituir:
+        cur.execute("DELETE FROM builds")
+        cur.execute("DELETE FROM produtos")
+
+    mapa_produtos = {}
+    for p in dados.get("produtos", []):
+        cur.execute(
+            "INSERT INTO produtos (categoria, nome, termo_busca, criado_em, modo, url_fixa) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (p["categoria"], p["nome"], p["termo_busca"], p.get("criado_em") or _agora(),
+             p.get("modo", "busca"), p.get("url_fixa")),
+        )
+        mapa_produtos[p["id"]] = cur.lastrowid
+
+    for pr in dados.get("precos", []):
+        novo_produto_id = mapa_produtos.get(pr["produto_id"])
+        if novo_produto_id is None:
+            continue
+        cur.execute(
+            "INSERT INTO precos (produto_id, loja, titulo, preco, url, buscado_em) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (novo_produto_id, pr["loja"], pr.get("titulo", ""), pr["preco"], pr.get("url", ""), pr["buscado_em"]),
+        )
+
+    mapa_builds = {}
+    for b in dados.get("builds", []):
+        cur.execute(
+            "INSERT INTO builds (nome, criado_em) VALUES (?, ?)",
+            (b["nome"], b.get("criado_em") or _agora()),
+        )
+        mapa_builds[b["id"]] = cur.lastrowid
+
+    for bi in dados.get("build_itens", []):
+        novo_build_id = mapa_builds.get(bi["build_id"])
+        if novo_build_id is None:
+            continue
+        produto_id_original = bi.get("produto_id")
+        novo_produto_id = mapa_produtos.get(produto_id_original) if produto_id_original is not None else None
+        cur.execute(
+            "INSERT INTO build_itens (build_id, categoria, produto_id, loja, titulo, preco, url, atualizado_em) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (novo_build_id, bi["categoria"], novo_produto_id, bi.get("loja"), bi.get("titulo"),
+             bi.get("preco"), bi.get("url"), bi.get("atualizado_em")),
+        )
+
+    for bt in dados.get("build_totais", []):
+        novo_build_id = mapa_builds.get(bt["build_id"])
+        if novo_build_id is None:
+            continue
+        cur.execute(
+            "INSERT INTO build_totais (build_id, total, calculado_em) VALUES (?, ?, ?)",
+            (novo_build_id, bt["total"], bt.get("calculado_em") or _agora()),
+        )
+
+    conn.commit()
+    conn.close()
+    return len(mapa_produtos), len(mapa_builds)

@@ -25,7 +25,7 @@ DB_PATH = os.path.join(BASE_DIR, "precos.db")
 # --------------------------------------------------------------------------
 # Versão do app e checagem de atualização (ver atualizacoes.py)
 # --------------------------------------------------------------------------
-VERSAO_APP = "1.0.0"
+VERSAO_APP = "1.0.1"
 REPO_GITHUB = "pablozandonadi/zandonadi-radar"
 
 # --------------------------------------------------------------------------
