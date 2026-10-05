@@ -12,7 +12,7 @@ from datetime import datetime
 
 import database as db
 from config import CATEGORIAS, LOJAS_DISPONIVEIS, LOJAS_ELETRO_MOVEIS
-from notificacoes import enviar_alerta_email
+from notificacoes import enviar_alerta_email, verificar_e_alertar_queda_produto
 from scraper import buscar_em_todas_as_lojas, buscar_produto_por_url
 
 DIAS_SEMANA = ["seg", "ter", "qua", "qui", "sex", "sab", "dom"]
@@ -188,6 +188,7 @@ def executar_rotina(rotina, callback_progresso=None, log_fn=None, horario=None):
             resultados = _buscar_preco_produto(produto)
             if resultados:
                 db.registrar_precos(produto["id"], resultados)
+                verificar_e_alertar_queda_produto(produto["id"])
                 melhor = min(resultados, key=lambda r: r["preco"])
                 db.definir_item_build(
                     build["id"], categoria_chave, produto["id"],
@@ -219,6 +220,7 @@ def executar_rotina(rotina, callback_progresso=None, log_fn=None, horario=None):
             resultados = _buscar_preco_produto(produto)
             if resultados:
                 db.registrar_precos(produto["id"], resultados)
+                verificar_e_alertar_queda_produto(produto["id"])
                 if rotina.get("alertar_menor_preco"):
                     _checar_novo_recorde(produto, novos_recordes)
 

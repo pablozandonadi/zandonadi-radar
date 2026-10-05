@@ -1,6 +1,10 @@
 requests>=2.31.0
 beautifulsoup4>=4.12.0
 
+# Janela do app: a interface (pasta web/) é HTML/CSS/JS desenhada num
+# WebView2 (Windows) por essa biblioteca. Rode com `python main_web.py`.
+pywebview>=5.0
+
 # Faz as requisições "de busca rápida" imitarem o footprint de um Chrome de
 # verdade (TLS/HTTP), o que evita boa parte dos bloqueios 403 que a
 # biblioteca requests sozinha toma em lojas com proteção anti-robô.
@@ -14,14 +18,16 @@ curl_cffi>=0.7.0
 # gerencia o driver sozinho.
 selenium>=4.20.0
 
-# Gráfico de variação de preço na tela de histórico.
-matplotlib>=3.8.0
-
 # Melhorias opcionais com LLM (filtro de relevância, leitura de preço quando
 # o site muda, busca em linguagem natural) — veja llm_config.py. Só é usado
 # se LLM_ATIVADO estiver True lá.
 openai>=1.0.0
 
-# Ícone na bandeja do sistema (perto do relógio) — fechar no X minimiza pra
-# lá em vez de encerrar o programa.
-pystray>=0.19.0
+# --- Só pra interface antiga em Tkinter (main.py, mantida como legado) ---
+# Gráficos do histórico e ícone na bandeja do sistema.
+# matplotlib>=3.8.0
+# pystray>=0.19.0
+
+# --- Só pra gerar o instalador (instalador\gerar_instalador.ps1) ---
+# pyinstaller>=6.0
+# (e o Inno Setup 6 instalado no Windows)

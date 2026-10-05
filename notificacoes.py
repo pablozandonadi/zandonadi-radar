@@ -7,6 +7,9 @@ que você preenche localmente (veja as instruções lá).
 
 import smtplib
 from email.mime.text import MIMEText
+from datetime import datetime
+
+import database as db
 
 try:
     import email_config as cfg
@@ -43,3 +46,37 @@ def enviar_alerta_email(destino, assunto, corpo):
         return True, None
     except Exception as e:
         return False, str(e)
+
+
+def verificar_e_alertar_queda_produto(produto_id):
+    """
+    Chame isso depois de registrar um preço novo (db.registrar_precos) pra
+    um produto — se esse produto tem um alerta de % configurado (ver tela
+    de Configurações / botão 🔔 na lista) e a queda bateu ou passou do
+    percentual, manda um e-mail pro endereço padrão configurado. Fail-open:
+    sem alerta configurado, sem e-mail padrão definido, ou sem remetente
+    configurado, só não faz nada — nunca quebra a busca por causa disso.
+    """
+    produto = db.obter_produto(produto_id)
+    if not produto or not produto.get("alerta_queda_percentual"):
+        return
+
+    destino = db.obter_configuracao("email_alerta_padrao")
+    if not destino:
+        return
+
+    variacao = db.variacao_preco(produto_id)
+    if not variacao or variacao["status"] != "verde" or not variacao.get("anterior_min"):
+        return
+
+    queda_percentual = abs(variacao["diferenca"]) / variacao["anterior_min"] * 100
+    if queda_percentual < produto["alerta_queda_percentual"]:
+        return
+
+    assunto = f"💰 {produto['nome']} caiu {queda_percentual:.0f}%"
+    corpo = (
+        f"“{produto['nome']}” caiu de R$ {variacao['anterior_min']:.2f} para R$ {variacao['atual']:.2f} "
+        f"({queda_percentual:.0f}% de queda — seu alerta era a partir de {produto['alerta_queda_percentual']:.0f}%).\n\n"
+        f"Checado em {datetime.now().strftime('%d/%m/%Y %H:%M')} pelo Zandonadi Radar."
+    )
+    enviar_alerta_email(destino, assunto, corpo)

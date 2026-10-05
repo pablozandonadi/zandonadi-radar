@@ -10,6 +10,7 @@ Tabelas:
   build_totais    -> histórico do valor total calculado de cada build
 """
 
+import json
 import sqlite3
 from datetime import datetime
 
@@ -50,6 +51,17 @@ def inicializar_banco():
         cur.execute("ALTER TABLE produtos ADD COLUMN modo TEXT NOT NULL DEFAULT 'busca'")
     if "url_fixa" not in colunas_produtos:
         cur.execute("ALTER TABLE produtos ADD COLUMN url_fixa TEXT")
+    if "specs_compat" not in colunas_produtos:
+        # JSON com specs estimadas pela IA pra checar compatibilidade no
+        # Montar PC (ex.: {"socket": "AM5"}) — None até ser calculado pela
+        # primeira vez (ver compatibilidade.py). Nunca é uma fonte oficial,
+        # só uma estimativa.
+        cur.execute("ALTER TABLE produtos ADD COLUMN specs_compat TEXT")
+    if "alerta_queda_percentual" not in colunas_produtos:
+        # Se preenchido, avisa por e-mail (destinatário padrão definido em
+        # Configurações) quando o preço desse produto cair pelo menos esse
+        # tanto % em relação ao menor preço já visto.
+        cur.execute("ALTER TABLE produtos ADD COLUMN alerta_queda_percentual REAL")
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS precos (
@@ -96,6 +108,15 @@ def inicializar_banco():
             total REAL NOT NULL,
             calculado_em TEXT NOT NULL,
             FOREIGN KEY (build_id) REFERENCES builds (id) ON DELETE CASCADE
+        )
+    """)
+
+    # Configurações gerais do app (chave/valor) — hoje só o e-mail padrão
+    # dos alertas de queda de preço por item (ver tela de Configurações).
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS configuracoes (
+            chave TEXT PRIMARY KEY,
+            valor TEXT
         )
     """)
 
@@ -690,3 +711,69 @@ def importar_dados(dados, substituir=False):
     conn.commit()
     conn.close()
     return len(mapa_produtos), len(mapa_builds)
+
+
+# --------------------------------------------------------------------------
+# Configurações gerais (chave/valor)
+# --------------------------------------------------------------------------
+
+def obter_configuracao(chave, padrao=None):
+    conn = conectar()
+    cur = conn.cursor()
+    cur.execute("SELECT valor FROM configuracoes WHERE chave = ?", (chave,))
+    linha = cur.fetchone()
+    conn.close()
+    return linha["valor"] if linha else padrao
+
+
+def definir_configuracao(chave, valor):
+    conn = conectar()
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO configuracoes (chave, valor) VALUES (?, ?) "
+        "ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor",
+        (chave, valor),
+    )
+    conn.commit()
+    conn.close()
+
+
+# --------------------------------------------------------------------------
+# Compatibilidade (specs estimadas pela IA) e alerta de queda por item
+# --------------------------------------------------------------------------
+
+def obter_specs_compat(produto_id):
+    """Devolve o dict de specs já calculado (ver compatibilidade.py), ou
+    None se ainda não foi calculado pra esse produto."""
+    conn = conectar()
+    cur = conn.cursor()
+    cur.execute("SELECT specs_compat FROM produtos WHERE id = ?", (produto_id,))
+    linha = cur.fetchone()
+    conn.close()
+    if not linha or not linha["specs_compat"]:
+        return None
+    try:
+        return json.loads(linha["specs_compat"])
+    except (TypeError, ValueError):
+        return None
+
+
+def definir_specs_compat(produto_id, specs):
+    conn = conectar()
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE produtos SET specs_compat = ? WHERE id = ?",
+        (json.dumps(specs, ensure_ascii=False), produto_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def definir_alerta_queda_produto(produto_id, percentual):
+    """`percentual` é um número (ex.: 10 = avisar se cair 10% ou mais) ou
+    None pra desligar o alerta desse produto."""
+    conn = conectar()
+    cur = conn.cursor()
+    cur.execute("UPDATE produtos SET alerta_queda_percentual = ? WHERE id = ?", (percentual, produto_id))
+    conn.commit()
+    conn.close()

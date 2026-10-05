@@ -29,6 +29,7 @@ if getattr(sys, "frozen", False):
     sys.path.insert(0, os.path.dirname(sys.executable))
 
 import atualizacoes
+import compatibilidade
 import database as db
 import llm
 import notificacoes
@@ -38,78 +39,7 @@ from config import (
     VERSAO_APP,
 )
 from scraper import buscar_em_todas_as_lojas, buscar_produto_por_url
-
-NOME_TAREFA_AGENDADA = "ZandonadiRadar_Rotinas"
-
-
-def _caminho_checador():
-    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "rotina_checador.py")
-
-
-def _caminho_pythonw():
-    pythonw = os.path.join(os.path.dirname(sys.executable), "pythonw.exe")
-    return pythonw if os.path.exists(pythonw) else sys.executable
-
-
-def _comando_tarefa_agendada():
-    """
-    Comando que a Tarefa Agendada do Windows roda a cada 15 minutos. Rodando
-    de código-fonte (`python main.py`), é o pythonw.exe chamando
-    rotina_checador.py direto. Já "congelado" (instalado via o instalador,
-    sem Python separado), não existe um rotina_checador.py solto pra
-    chamar — o próprio .exe principal já leva esse código embutido, então a
-    tarefa roda o mesmo .exe com um argumento especial (ver main(), lá
-    embaixo) que faz ele rodar só a checagem, sem abrir a janela.
-    """
-    if getattr(sys, "frozen", False):
-        return f'"{sys.executable}" --rotina-checador'
-    return f'"{_caminho_pythonw()}" "{_caminho_checador()}"'
-
-
-def garantir_tarefa_agendada():
-    """
-    Cria (ou atualiza) uma Tarefa Agendada do Windows que roda o checador de
-    rotinas a cada 15 minutos, mesmo com o programa fechado. Silenciosa se
-    falhar (ex.: não é Windows, ou schtasks sem permissão) — nesse caso as
-    rotinas só rodam enquanto o app estiver aberto não, ficam só salvas.
-    """
-    if sys.platform != "win32":
-        return False
-    comando = _comando_tarefa_agendada()
-    try:
-        resultado = subprocess.run(
-            ["schtasks", "/create", "/tn", NOME_TAREFA_AGENDADA, "/tr", comando,
-             "/sc", "minute", "/mo", "15", "/f"],
-            capture_output=True, text=True, timeout=15,
-        )
-        return resultado.returncode == 0
-    except Exception:
-        return False
-
-
-def remover_tarefa_agendada():
-    if sys.platform != "win32":
-        return
-    try:
-        subprocess.run(
-            ["schtasks", "/delete", "/tn", NOME_TAREFA_AGENDADA, "/f"],
-            capture_output=True, text=True, timeout=15,
-        )
-    except Exception:
-        pass
-
-
-def tarefa_agendada_existe():
-    if sys.platform != "win32":
-        return False
-    try:
-        resultado = subprocess.run(
-            ["schtasks", "/query", "/tn", NOME_TAREFA_AGENDADA],
-            capture_output=True, text=True, timeout=10,
-        )
-        return resultado.returncode == 0
-    except Exception:
-        return False
+from tarefas_agendadas import garantir_tarefa_agendada, remover_tarefa_agendada, tarefa_agendada_existe
 
 if sys.platform == "win32":
     # Sem isso, o Windows agrupa a barra de tarefas pelo AppUserModelID de
@@ -134,7 +64,7 @@ COR_NEUTRO = "#8b93a3"
 
 COR_FUNDO = "#14171c"
 COR_CARD_BG = "#1b1f26"
-COR_CARD_BORDA = "#2c313d"
+COR_CARD_BORDA = "#f3efe6"  # borda grossa clara (neo-brutalismo) em vez de borda sutil escura
 COR_RODAPE_BG = "#1f242e"
 
 COR_TEXTO = "#eaeef4"
@@ -167,20 +97,20 @@ class BotaoArredondado:
     coisa nem outra. Expõe pack/grid/config parecido com tk.Button pra poder
     substituir os botões antigos sem mexer em quem os usa.
     """
-    RAIO = 10
-    SOMBRA = 3
+    RAIO = 12
+    SOMBRA = 5
 
     _ESTILOS = {
         "primario": dict(
-            bg=COR_ACCENT, fg="#1a1108", hover=COR_ACCENT_ESCURO, sombra="#0a0b0e",
+            bg=COR_ACCENT, fg="#1a1108", hover=COR_ACCENT_ESCURO, sombra=COR_CARD_BORDA,
             desabilitado="#5a4635", fg_desabilitado="#8b8378",
         ),
         "secundario": dict(
-            bg=COR_CARD_BORDA, fg=COR_TEXTO, hover="#3a4152", sombra="#0a0b0e",
+            bg=COR_CARD_BG, fg=COR_TEXTO, hover="#262c38", sombra=COR_CARD_BORDA,
             desabilitado="#22262e", fg_desabilitado="#5b6270",
         ),
         "perigo": dict(
-            bg="#b3392b", fg="#fff5f2", hover="#8f2c21", sombra="#0a0b0e",
+            bg="#ff6b6b", fg="#2a0e0e", hover="#e25555", sombra=COR_CARD_BORDA,
             desabilitado="#3a2624", fg_desabilitado="#8a6a67",
         ),
     }
@@ -243,7 +173,10 @@ class BotaoArredondado:
         else:
             cor_face = self._cores["bg"]
         pts_face = self._pontos_arredondados(0, 0, face_w, face_h, self.RAIO)
-        self.canvas.create_polygon(pts_face, smooth=True, fill=cor_face, outline="")
+        cor_contorno = "" if desabilitado else COR_CARD_BORDA
+        self.canvas.create_polygon(
+            pts_face, smooth=True, fill=cor_face, outline=cor_contorno, width=2
+        )
 
         cor_texto = self._cores["fg_desabilitado"] if desabilitado else self._cores["fg"]
         self.canvas.create_text(face_w / 2, face_h / 2, text=self._texto, fill=cor_texto, font=self._font)
@@ -302,7 +235,7 @@ def criar_botao(parent, texto, comando=None, estilo="primario", font_size=10):
 def criar_entry(parent, **kw):
     return tk.Entry(
         parent, bg=COR_CARD_BG, fg=COR_TEXTO, insertbackground=COR_TEXTO,
-        relief="flat", highlightthickness=1, highlightbackground=COR_CARD_BORDA,
+        relief="flat", highlightthickness=2, highlightbackground=COR_CARD_BORDA,
         highlightcolor=COR_ACCENT, font=("Segoe UI", 10), **kw
     )
 
@@ -746,7 +679,7 @@ class RastreadorApp(tk.Tk):
         btn_parar.grid(row=1, column=3, padx=(8, 0))
         btn_parar.config(state="disabled")
 
-        linha_sugestao = tk.Frame(frame, bg=COR_CARD_BG, highlightbackground=COR_CARD_BORDA, highlightthickness=1)
+        linha_sugestao = tk.Frame(frame, bg=COR_CARD_BG, highlightbackground=COR_CARD_BORDA, highlightthickness=3)
         label_sugestao = tk.Label(
             linha_sugestao, text="", bg=COR_CARD_BG, fg=COR_TEXTO, font=("Segoe UI", 9),
             wraplength=560, justify="left",
@@ -1075,7 +1008,7 @@ class RastreadorApp(tk.Tk):
         status_var = tk.StringVar(value="")
         tk.Label(frame, textvariable=status_var, bg=COR_FUNDO, fg=COR_TEXTO_MUTED).pack(anchor="w", padx=20, pady=(4, 0))
 
-        resultado_caixa = tk.Frame(frame, bg=COR_CARD_BG, highlightbackground=COR_CARD_BORDA, highlightthickness=1)
+        resultado_caixa = tk.Frame(frame, bg=COR_CARD_BG, highlightbackground=COR_CARD_BORDA, highlightthickness=3)
         label_titulo_encontrado = tk.Label(
             resultado_caixa, text="", bg=COR_CARD_BG, fg=COR_TEXTO, font=("Segoe UI", 11, "bold"),
             wraplength=820, justify="left",
@@ -1216,7 +1149,7 @@ class RastreadorApp(tk.Tk):
         variacao = db.variacao_preco(produto["id"])
         melhor = db.melhor_preco_atual(produto["id"])
 
-        card = tk.Frame(container, bg=COR_CARD_BG, highlightbackground=COR_CARD_BORDA, highlightthickness=1)
+        card = tk.Frame(container, bg=COR_CARD_BG, highlightbackground=COR_CARD_BORDA, highlightthickness=3)
         card.pack(fill="x", pady=5, padx=2)
 
         esquerda = tk.Frame(card, bg=COR_CARD_BG)
@@ -1283,9 +1216,73 @@ class RastreadorApp(tk.Tk):
             lambda: self._mostrar_historico(produto), estilo="secundario"
         ).pack(side="left", padx=4)
         criar_botao(
+            direita, "🔔" if produto.get("alerta_queda_percentual") else "🔕",
+            lambda: self._configurar_alerta_produto(produto, categoria_chave), estilo="secundario"
+        ).pack(side="left", padx=4)
+        criar_botao(
             direita, "🗑️",
             lambda: self._remover_produto(produto, categoria_chave), estilo="perigo"
         ).pack(side="left", padx=4)
+
+    def _configurar_alerta_produto(self, produto, categoria_chave):
+        """Diálogo simples: 'avisar quando o preço cair pelo menos X%'. Usa o
+        e-mail padrão definido em Configurações — sem isso definido, ainda dá
+        pra marcar o %, mas nenhum e-mail sai até configurar."""
+        atual = produto.get("alerta_queda_percentual")
+
+        janela = tk.Toplevel(self, bg=COR_FUNDO)
+        janela.title("Alerta de queda de preço")
+        janela.geometry("380x200")
+        janela.resizable(False, False)
+
+        tk.Label(
+            janela, text=produto["nome"], font=("Segoe UI", 10, "bold"), bg=COR_FUNDO, fg=COR_TEXTO,
+            wraplength=340, justify="left",
+        ).pack(anchor="w", padx=16, pady=(16, 10))
+
+        ativo_var = tk.BooleanVar(value=atual is not None)
+        linha_pct = tk.Frame(janela, bg=COR_FUNDO)
+
+        tk.Checkbutton(
+            janela, text="Avisar por e-mail quando o preço cair pelo menos:", variable=ativo_var,
+            command=lambda: (linha_pct.pack(anchor="w", padx=16, pady=(0, 10))
+                              if ativo_var.get() else linha_pct.pack_forget()),
+            bg=COR_FUNDO, fg=COR_TEXTO, selectcolor=COR_CARD_BG, activebackground=COR_FUNDO,
+            activeforeground=COR_TEXTO, highlightthickness=0, anchor="w",
+        ).pack(anchor="w", padx=16)
+
+        entry_pct = criar_entry(linha_pct, width=6)
+        entry_pct.insert(0, f"{atual:.0f}" if atual else "10")
+        entry_pct.pack(side="left", ipady=3)
+        tk.Label(linha_pct, text="%  (em relação ao menor preço já visto)", bg=COR_FUNDO, fg=COR_TEXTO_MUTED).pack(
+            side="left", padx=(6, 0)
+        )
+        if ativo_var.get():
+            linha_pct.pack(anchor="w", padx=16, pady=(0, 10))
+
+        def salvar():
+            if not ativo_var.get():
+                db.definir_alerta_queda_produto(produto["id"], None)
+            else:
+                texto = entry_pct.get().strip().replace(",", ".")
+                try:
+                    percentual = float(texto)
+                    if percentual <= 0:
+                        raise ValueError
+                except ValueError:
+                    messagebox.showwarning("Valor inválido", "Digite um número maior que 0 (ex.: 10).")
+                    return
+                if not db.obter_configuracao("email_alerta_padrao"):
+                    messagebox.showwarning(
+                        "Sem e-mail configurado",
+                        "Vou salvar mesmo assim, mas configure um e-mail padrão em "
+                        "Configurações pra esse alerta poder sair de verdade."
+                    )
+                db.definir_alerta_queda_produto(produto["id"], percentual)
+            janela.destroy()
+            self.mostrar_categoria(categoria_chave)
+
+        criar_botao(janela, "Salvar", salvar, estilo="primario").pack(pady=12)
 
     def _remover_produto(self, produto, categoria_chave):
         if messagebox.askyesno("Remover", f"Remover “{produto['nome']}” da sua lista?"):
@@ -1339,6 +1336,7 @@ class RastreadorApp(tk.Tk):
                     return
                 if resultados:
                     db.registrar_precos(produto["id"], resultados)
+                    notificacoes.verificar_e_alertar_queda_produto(produto["id"])
                 if self._tela_ativa == "categoria" and self._categoria_ativa == categoria_chave:
                     self.mostrar_categoria(categoria_chave)
                 if not resultados:
@@ -1558,6 +1556,82 @@ class RastreadorApp(tk.Tk):
 
         self._desenhar_build(frame, build)
 
+    def _desenhar_diagrama_pc(self, parent, itens):
+        """
+        Visão geral ilustrada (gabinete em corte) de quais categorias já têm
+        peça escolhida — ● acesa (cor de destaque) = tem peça, ○ apagada =
+        falta escolher. Só visual/resumo; selecionar a peça de cada slot
+        continua pelos cards logo abaixo (já testados, sem risco de mexer
+        nisso aqui).
+        """
+        wrap = tk.Frame(parent, bg=COR_FUNDO)
+        wrap.pack(pady=(0, 16))
+
+        def preenchido(cat):
+            item = itens.get(cat)
+            return bool(item and item.get("produto_id"))
+
+        def cor_peca(cat):
+            return COR_ACCENT if preenchido(cat) else COR_CARD_BG
+
+        canvas = tk.Canvas(
+            wrap, bg=COR_FUNDO_SIDEBAR, width=820, height=400,
+            highlightthickness=3, highlightbackground=COR_CARD_BORDA,
+        )
+        canvas.pack()
+        borda = COR_CARD_BORDA
+
+        def rotulo(x, y, texto, cat):
+            marca = "●" if preenchido(cat) else "○"
+            cor_txt = COR_ACCENT_CLARO if preenchido(cat) else COR_TEXTO_FRACO
+            canvas.create_text(
+                x, y, text=f"{marca}  {texto}", fill=cor_txt, font=("Segoe UI", 9, "bold")
+            )
+
+        # gabinete (contorno do PC em corte)
+        canvas.create_rectangle(230, 25, 610, 340, outline=borda, width=3)
+
+        # placa mãe
+        canvas.create_rectangle(260, 60, 550, 275, outline=borda, width=2, fill=cor_peca("placa_mae"))
+        rotulo(405, 48, "Placa Mãe", "placa_mae")
+
+        # water cooler + processador
+        canvas.create_oval(340, 100, 400, 160, outline=borda, width=2, fill=COR_FUNDO_SIDEBAR)
+        canvas.create_line(347, 107, 393, 153, fill=borda, width=2)
+        canvas.create_line(393, 107, 347, 153, fill=borda, width=2)
+        canvas.create_rectangle(355, 115, 385, 145, outline=borda, width=2, fill=cor_peca("processador"))
+        rotulo(370, 178, "Processador", "processador")
+        rotulo(370, 194, "(Water Cooler)", "water_cooler")
+
+        # memória ram
+        canvas.create_rectangle(420, 80, 435, 185, outline=borda, width=2, fill=cor_peca("memoria_ram"))
+        canvas.create_rectangle(442, 80, 457, 185, outline=borda, width=2, fill=cor_peca("memoria_ram"))
+        rotulo(495, 130, "Memória RAM", "memoria_ram")
+
+        # ssd (m.2)
+        canvas.create_rectangle(280, 232, 360, 250, outline=borda, width=2, fill=cor_peca("ssd"))
+        rotulo(320, 216, "SSD", "ssd")
+
+        # placa de vídeo
+        canvas.create_rectangle(270, 288, 530, 328, outline=borda, width=2, fill=cor_peca("placa_video"))
+        canvas.create_oval(290, 296, 322, 320, outline=borda, width=2, fill=COR_FUNDO_SIDEBAR)
+        canvas.create_oval(410, 296, 442, 320, outline=borda, width=2, fill=COR_FUNDO_SIDEBAR)
+        rotulo(400, 352, "Placa de Vídeo", "placa_video")
+
+        # fonte
+        canvas.create_rectangle(650, 250, 730, 330, outline=borda, width=2, fill=cor_peca("fonte"))
+        canvas.create_oval(670, 270, 710, 310, outline=borda, width=2, fill=COR_FUNDO_SIDEBAR)
+        rotulo(690, 240, "Fonte", "fonte")
+
+        # gabinete (rótulo)
+        rotulo(420, 378, "Gabinete", "gabinete")
+
+        # monitor (periférico, ao lado — não faz parte do gabinete físico)
+        canvas.create_rectangle(60, 70, 210, 190, outline=borda, width=2, fill=cor_peca("monitor"))
+        canvas.create_rectangle(120, 190, 150, 210, outline=borda, width=2)
+        canvas.create_rectangle(100, 210, 170, 218, outline=borda, width=2)
+        rotulo(135, 60, "Monitor", "monitor")
+
     def _desenhar_build(self, frame_pai, build):
         # remove tudo abaixo da barra de topo (mantém o topo)
         filhos = frame_pai.winfo_children()
@@ -1579,11 +1653,18 @@ class RastreadorApp(tk.Tk):
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
+        self._desenhar_diagrama_pc(lista_frame, itens)
+
         for categoria_chave in ORDEM_CATEGORIAS:
             self._slot_build(lista_frame, build, categoria_chave, itens.get(categoria_chave))
 
+        # ---- compatibilidade (estimada pela IA — ver compatibilidade.py) ----
+        frame_compat = tk.Frame(lista_frame, bg=COR_FUNDO)
+        frame_compat.pack(fill="x", pady=(4, 10))
+        self._checar_compatibilidade_build(frame_compat, build["id"], itens)
+
         # ---- rodapé: total ----
-        rodape = tk.Frame(frame_pai, bg=COR_RODAPE_BG, highlightbackground=COR_CARD_BORDA, highlightthickness=1)
+        rodape = tk.Frame(frame_pai, bg=COR_RODAPE_BG, highlightbackground=COR_CARD_BORDA, highlightthickness=3)
         rodape.pack(fill="x", padx=20, pady=(6, 16))
 
         itens_atualizados = db.listar_itens_build(build["id"])
@@ -1642,6 +1723,55 @@ class RastreadorApp(tk.Tk):
             rodape, "🔄 Recalcular preços de todas as peças",
             lambda: self._recalcular_precos_build(build), estilo="secundario"
         ).pack(side="right", padx=(0, 4), pady=12)
+
+    def _checar_compatibilidade_build(self, frame_pai, build_id, itens):
+        """Roda a checagem de compatibilidade (ver compatibilidade.py) numa
+        thread — faz chamadas de IA, então pode demorar alguns segundos.
+        Fail-open: sem IA configurada, ou com menos de 2 peças escolhidas,
+        nem mostra o painel."""
+        preenchidos = [i for i in itens.values() if i.get("produto_id")]
+        if len(preenchidos) < 2 or not llm.esta_configurado():
+            return
+
+        label_status = tk.Label(
+            frame_pai, text="🔎 Checando compatibilidade entre as peças (estimativa da IA)...",
+            font=("Segoe UI", 9), bg=COR_FUNDO, fg=COR_TEXTO_FRACO,
+        )
+        label_status.pack(anchor="w")
+
+        def trabalho():
+            try:
+                avisos = compatibilidade.checar_build(itens)
+            except Exception:
+                avisos = []
+            self.fila_eventos.put(lambda: self._mostrar_avisos_compatibilidade(frame_pai, label_status, avisos))
+
+        threading.Thread(target=trabalho, daemon=True).start()
+
+    def _mostrar_avisos_compatibilidade(self, frame_pai, label_status, avisos):
+        try:
+            label_status.destroy()
+        except tk.TclError:
+            return  # a pessoa já saiu dessa tela — nada a atualizar
+        if not avisos:
+            return
+        try:
+            card = tk.Frame(
+                frame_pai, bg=COR_VERMELHO_CHIP_BG, highlightbackground=COR_VERMELHO, highlightthickness=1
+            )
+            card.pack(fill="x", pady=(2, 0))
+            tk.Label(
+                card, text="⚠️ Possível incompatibilidade (estimativa da IA — confira antes de comprar):",
+                font=("Segoe UI", 9, "bold"), bg=COR_VERMELHO_CHIP_BG, fg=COR_VERMELHO,
+            ).pack(anchor="w", padx=12, pady=(8, 2))
+            for aviso in avisos:
+                tk.Label(
+                    card, text=f"•  {aviso}", font=("Segoe UI", 9), bg=COR_VERMELHO_CHIP_BG, fg=COR_TEXTO,
+                    wraplength=760, justify="left",
+                ).pack(anchor="w", padx=20, pady=(0, 2))
+            tk.Frame(card, bg=COR_VERMELHO_CHIP_BG, height=8).pack()
+        except tk.TclError:
+            pass
 
     def _recalcular_precos_build(self, build):
         """
@@ -1704,6 +1834,7 @@ class RastreadorApp(tk.Tk):
 
                 if resultados:
                     db.registrar_precos(produto["id"], resultados)
+                    notificacoes.verificar_e_alertar_queda_produto(produto["id"])
                     melhor = min(resultados, key=lambda r: r["preco"])
                     db.definir_item_build(
                         build["id"], categoria_chave, produto["id"],
@@ -1889,7 +2020,7 @@ class RastreadorApp(tk.Tk):
 
     def _slot_build(self, container, build, categoria_chave, item_atual):
         rotulo = CATEGORIAS[categoria_chave]
-        card = tk.Frame(container, bg=COR_CARD_BG, highlightbackground=COR_CARD_BORDA, highlightthickness=1)
+        card = tk.Frame(container, bg=COR_CARD_BG, highlightbackground=COR_CARD_BORDA, highlightthickness=3)
         card.pack(fill="x", pady=5, padx=2)
 
         esquerda = tk.Frame(card, bg=COR_CARD_BG)
@@ -1946,7 +2077,7 @@ class RastreadorApp(tk.Tk):
         listbox = tk.Listbox(
             janela, font=("Segoe UI", 10), bg=COR_CARD_BG, fg=COR_TEXTO,
             selectbackground=COR_ACCENT, selectforeground="#1a1108",
-            relief="flat", highlightthickness=1, highlightbackground=COR_CARD_BORDA,
+            relief="flat", highlightthickness=2, highlightbackground=COR_CARD_BORDA,
         )
         listbox.pack(fill="both", expand=True, padx=12, pady=6)
         for p in produtos:
@@ -1970,6 +2101,7 @@ class RastreadorApp(tk.Tk):
                     resultados = buscar_em_todas_as_lojas(produto["termo_busca"], lojas=LOJAS_DISPONIVEIS)
                 if resultados:
                     db.registrar_precos(produto["id"], resultados)
+                    notificacoes.verificar_e_alertar_queda_produto(produto["id"])
                     melhor = min(resultados, key=lambda r: r["preco"])
                 else:
                     melhor = db.melhor_preco_atual(produto["id"])
@@ -2045,7 +2177,7 @@ class RastreadorApp(tk.Tk):
             self._linha_rotina(lista_frame, rotina)
 
     def _linha_rotina(self, container, rotina):
-        card = tk.Frame(container, bg=COR_CARD_BG, highlightbackground=COR_CARD_BORDA, highlightthickness=1)
+        card = tk.Frame(container, bg=COR_CARD_BG, highlightbackground=COR_CARD_BORDA, highlightthickness=3)
         card.pack(fill="x", pady=5, padx=2)
 
         esquerda = tk.Frame(card, bg=COR_CARD_BG)
@@ -2406,7 +2538,7 @@ class RastreadorApp(tk.Tk):
 
         tk.Label(frame_alerta, text="E-mail para avisar:", bg=COR_FUNDO, fg=COR_TEXTO_MUTED).pack(anchor="w")
         entry_email = criar_entry(frame_alerta, width=32)
-        email_inicial = (rotina.get("alerta_email") if editando else None) or "pablo@zandonadi.adv.br"
+        email_inicial = (rotina.get("alerta_email") if editando else None) or db.obter_configuracao("email_alerta_padrao", "")
         entry_email.insert(0, email_inicial)
         entry_email.pack(anchor="w", pady=(2, 8), ipady=3)
 
@@ -2557,8 +2689,51 @@ class RastreadorApp(tk.Tk):
             topo, text="⚙️ Configurações", font=(FONTE_TITULO, 22, "bold"), bg=COR_FUNDO, fg=COR_TEXTO
         ).pack(side="left")
 
+        # --- Alertas de queda de preço por item ---
+        card_alertas = tk.Frame(frame, bg=COR_CARD_BG, highlightbackground=COR_CARD_BORDA, highlightthickness=3)
+        card_alertas.pack(fill="x", padx=20, pady=(6, 10))
+        tk.Label(
+            card_alertas, text="🔔 Alertas de queda de preço", font=("Segoe UI", 13, "bold"),
+            bg=COR_CARD_BG, fg=COR_TEXTO,
+        ).pack(anchor="w", padx=16, pady=(14, 4))
+        tk.Label(
+            card_alertas,
+            text="Configure aqui o e-mail que recebe os alertas. Depois, em cada produto da sua lista, "
+                 "clique no 🔔 pra escolher a partir de qual % de queda você quer ser avisado (ex.: avisar "
+                 "se cair 10% ou mais).",
+            bg=COR_CARD_BG, fg=COR_TEXTO_MUTED, wraplength=600, justify="left",
+        ).pack(anchor="w", padx=16)
+
+        linha_email_alerta = tk.Frame(card_alertas, bg=COR_CARD_BG)
+        linha_email_alerta.pack(anchor="w", padx=16, pady=(10, 16))
+        tk.Label(linha_email_alerta, text="E-mail padrão:", bg=COR_CARD_BG, fg=COR_TEXTO_MUTED).pack(
+            side="left", padx=(0, 8)
+        )
+        entry_email_alerta = criar_entry(linha_email_alerta, width=36)
+        entry_email_alerta.insert(0, db.obter_configuracao("email_alerta_padrao", ""))
+        entry_email_alerta.pack(side="left", padx=(0, 8), ipady=3)
+
+        def salvar_email_alerta():
+            email = entry_email_alerta.get().strip()
+            if email and "@" not in email:
+                messagebox.showwarning("E-mail inválido", "Digite um e-mail válido (ou deixe em branco).")
+                return
+            db.definir_configuracao("email_alerta_padrao", email)
+            if email and not notificacoes.remetente_configurado():
+                messagebox.showwarning(
+                    "Salvo, mas...",
+                    "E-mail salvo! Mas o remetente ainda não está configurado — preencha "
+                    "email_config.py (SMTP_EMAIL e SMTP_SENHA_APP) pra os alertas saírem de verdade."
+                )
+            else:
+                messagebox.showinfo("Salvo!", "E-mail padrão de alertas atualizado.")
+
+        criar_botao(linha_email_alerta, "Salvar", salvar_email_alerta, estilo="secundario", font_size=9).pack(
+            side="left"
+        )
+
         # --- Exportar ---
-        card_exportar = tk.Frame(frame, bg=COR_CARD_BG, highlightbackground=COR_CARD_BORDA, highlightthickness=1)
+        card_exportar = tk.Frame(frame, bg=COR_CARD_BG, highlightbackground=COR_CARD_BORDA, highlightthickness=3)
         card_exportar.pack(fill="x", padx=20, pady=(6, 10))
         tk.Label(
             card_exportar, text="📤 Exportar dados", font=("Segoe UI", 13, "bold"), bg=COR_CARD_BG, fg=COR_TEXTO,
@@ -2608,7 +2783,7 @@ class RastreadorApp(tk.Tk):
         )
 
         # --- Importar ---
-        card_importar = tk.Frame(frame, bg=COR_CARD_BG, highlightbackground=COR_CARD_BORDA, highlightthickness=1)
+        card_importar = tk.Frame(frame, bg=COR_CARD_BG, highlightbackground=COR_CARD_BORDA, highlightthickness=3)
         card_importar.pack(fill="x", padx=20, pady=(0, 10))
         tk.Label(
             card_importar, text="📥 Importar dados", font=("Segoe UI", 13, "bold"), bg=COR_CARD_BG, fg=COR_TEXTO,

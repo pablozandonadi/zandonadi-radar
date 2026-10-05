@@ -21,7 +21,9 @@ com um guia em PDF explicando como conseguir os dois).
 > caminho certo pra instalar.
 
 Pré-requisito: o **Google Chrome** precisa já estar instalado no computador
-(usado como reforço contra bloqueio anti-robô nas buscas).
+(usado como reforço contra bloqueio anti-robô nas buscas). A tela do
+programa usa o componente **WebView2** da Microsoft — o Windows 11 já
+traz, e o instalador baixa e instala sozinho se o seu Windows ainda não tiver.
 
 O programa confere sozinho, toda vez que abre, se saiu uma versão nova
 aqui no GitHub — e avisa, com um clique pra atualizar.
@@ -64,6 +66,14 @@ certificado pago, não é um problema específico deste app.
   orçamento"**, o total fica salvo — da próxima vez que você recalcular, ele
   mostra se o PC completo ficou mais barato ou mais caro que da última vez
   (mesmo esquema verde/vermelho).
+- Na lista de cada categoria, **📈 Histórico** mostra um gráfico da variação
+  do menor preço ao longo do tempo e a tabela de tudo que já foi encontrado;
+  **🔔** avisa por e-mail quando o preço cair X% ou mais.
+- **Rotinas** checam os preços sozinhas em horários que você escolhe (até
+  com o programa fechado, via Tarefa Agendada do Windows) e avisam por e-mail.
+- **Configurações** exporta/importa seus dados (backup ou levar pra outro PC).
+- Em **"Montar PC"**, o app também confere (com IA, se você configurou a
+  chave da OpenAI) se as peças são compatíveis entre si.
 
 ## Rodando a partir do código-fonte (pra quem quer programar/alterar o app)
 
@@ -85,8 +95,10 @@ seção 3).
 ## 2. Rodando o programa
 
 ```bash
-python main.py
+python main_web.py
 ```
+
+(`python main.py` abre a interface antiga em Tkinter, mantida só como legado.)
 
 Uma janela vai abrir. Na primeira vez que você adicionar um produto, o
 programa cria sozinho um arquivo `precos.db` (SQLite) na mesma pasta —
@@ -216,7 +228,11 @@ LOJAS_DISPONIVEIS = [
 | `config.py`     | Categorias, lojas, timeouts, filtro de relevância — ajustes gerais |
 | `database.py`   | Tudo relacionado ao SQLite (produtos, histórico, PCs montados) |
 | `scraper.py`    | Busca os produtos nas lojas, com anti-bloqueio em camadas e filtro de relevância (pode rodar sozinho pelo terminal) |
-| `main.py`       | Interface gráfica (Tkinter) — é o que você executa |
+| `main_web.py`   | Ponto de entrada do app — abre a janela com a interface em `web/` |
+| `web/index.html`| A interface (HTML/CSS/JS) |
+| `web_api.py`    | Ponte entre a interface e o resto (banco, lojas, rotinas, e-mail) |
+| `main.py`       | Interface antiga em Tkinter (legado) |
+| `instalador/`   | Receita pra gerar o instalador (`gerar_instalador.ps1`) |
 | `precos.db`     | Criado automaticamente na primeira busca — seu histórico fica aqui |
 
 ## 8. Limitações a saber

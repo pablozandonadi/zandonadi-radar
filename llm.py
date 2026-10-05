@@ -160,3 +160,60 @@ def sugerir_melhoria_termo_llm(termo_digitado):
         return sugestao
     except Exception:
         return None
+
+
+# Campos esperados por categoria, pra checagem de compatibilidade no Montar
+# PC (ver compatibilidade.py). Cada valor é (descrição pro prompt, chave no JSON).
+_CAMPOS_COMPAT_POR_CATEGORIA = {
+    "processador": ("o socket do processador, ex.: 'AM5', 'AM4', 'LGA1700', 'LGA1200'", "socket"),
+    "placa_mae": (
+        "o socket que ela aceita (ex.: 'AM5', 'LGA1700') e o tipo de memória RAM "
+        "que ela aceita ('DDR4' ou 'DDR5')",
+        None,
+    ),
+    "memoria_ram": ("o tipo da memória ('DDR4' ou 'DDR5')", "tipo"),
+    "placa_video": ("a potência de fonte recomendada pelo fabricante, em watts (só o número)", "watts_recomendados"),
+    "fonte": ("a potência dela, em watts (só o número)", "watts"),
+}
+
+
+def extrair_specs_compatibilidade(categoria, nome_produto):
+    """
+    Pede pra IA estimar, a partir do NOME do produto (não há uma base de
+    dados oficial de peças aqui), os dados técnicos relevantes pra checar
+    compatibilidade no Montar PC — socket, tipo de RAM, wattagem. É uma
+    estimativa, não uma fonte oficial: pode vir incompleta ou errada se o
+    nome do produto não tiver informação suficiente.
+
+    Devolve um dict (pode ter campos faltando/None) ou {} se a categoria não
+    é relevante pra compatibilidade, ou None se a IA não está configurada ou
+    a chamada falhar.
+    """
+    if categoria not in _CAMPOS_COMPAT_POR_CATEGORIA:
+        return {}
+    if not esta_configurado() or not nome_produto:
+        return None
+
+    try:
+        if categoria == "placa_mae":
+            pedido = (
+                "o socket que ela aceita (ex.: \"AM5\", \"AM4\", \"LGA1700\", \"LGA1200\", ou null se não "
+                "der pra saber) e o tipo de memória RAM que ela aceita (\"DDR4\", \"DDR5\", ou null)"
+            )
+            formato = '{"socket": "AM5" ou null, "tipo_ram": "DDR5" ou null}'
+        else:
+            descricao, chave = _CAMPOS_COMPAT_POR_CATEGORIA[categoria]
+            pedido = descricao
+            formato = f'{{"{chave}": valor ou null}}'
+
+        dados = _chamar_json(
+            "Você estima especificações técnicas de hardware de PC a partir do nome de um produto, "
+            "pra checar compatibilidade entre peças. Se não der pra saber com confiança a partir do "
+            "nome, responda null pro campo — não invente. Responda só com JSON, sem texto fora do JSON.",
+            f'Produto (categoria "{categoria}"): "{nome_produto}"\n\n'
+            f"Estime {pedido}.\n"
+            f"Responda: {formato}",
+        )
+        return dados if isinstance(dados, dict) else {}
+    except Exception:
+        return None

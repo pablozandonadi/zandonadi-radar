@@ -1,0 +1,1831 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8">
+<title>Zandonadi Radar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Work+Sans:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #14171c; --surface: #1b1f26; --surface-2: #0f1115;
+    --ink: #f3efe6; --ink-dim: #9aa1b0;
+    --accent: #ff6b3d; --accent-2: #ffb703;
+    --good: #3ecf8e; --bad: #ff6b6b;
+    --font-display: 'Archivo Black', 'Arial Black', sans-serif;
+    --font-body: 'Work Sans', system-ui, sans-serif;
+    --font-mono: 'Space Mono', 'Consolas', monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-body); overflow: hidden; font-size: 14px; }
+  .app { display: flex; height: 100%; }
+
+  .sidebar { width: 230px; flex: 0 0 230px; background: var(--surface-2); border-right: 3px solid var(--ink);
+    padding: 20px 14px; display: flex; flex-direction: column; gap: 4px; overflow-y: auto; }
+  .brand { font-family: var(--font-display); color: var(--accent); font-size: 1.1rem; line-height: 1.25; margin: 4px 4px 18px; }
+  .brand span { color: var(--ink); }
+  .nav-item { font-weight: 700; font-size: 0.85rem; padding: 10px 12px; border: 3px solid transparent; border-radius: 8px; cursor: pointer; }
+  .nav-item.active { background: var(--accent); color: #1a1108; border-color: var(--ink); box-shadow: 4px 4px 0 var(--ink); }
+  .nav-item:not(.active):hover { border-color: var(--ink-dim); }
+  .divider { height: 3px; background: var(--ink); opacity: 0.25; margin: 12px 2px; border: none; }
+  .cat-label { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em; color: var(--ink-dim); text-transform: uppercase; margin: 6px 12px 2px; }
+  .cat-item { font-size: 0.85rem; font-weight: 500; color: var(--ink-dim); padding: 7px 12px; cursor: pointer; border-radius: 6px; }
+  .cat-item.current { color: var(--ink); font-weight: 700; background: var(--surface); border: 2px solid var(--ink); }
+
+  @keyframes entradaLateral { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
+  .nav-item, .cat-item { animation: entradaLateral .35s ease both; }
+  .nav-item:nth-child(2) { animation-delay: .04s; }
+  .nav-item:nth-child(3) { animation-delay: .08s; }
+  .nav-item:nth-child(4) { animation-delay: .12s; }
+
+  .content { flex: 1; min-width: 0; padding: 20px 26px; overflow-y: auto; }
+  .page { display: none; max-width: 980px; }
+  .page.shown { display: block; }
+
+  h1.titulo { font-family: var(--font-display); font-size: 1.5rem; margin: 0 0 14px; }
+  .btn { font-weight: 700; font-size: 0.8rem; color: var(--ink); background: var(--surface);
+    border: 2.5px solid var(--ink); border-radius: 9px; padding: 8px 14px; box-shadow: 3px 3px 0 var(--ink);
+    cursor: pointer; transition: transform .08s, box-shadow .08s; }
+  .btn:hover { transform: translate(-1px,-1px); box-shadow: 4px 4px 0 var(--ink); }
+  .btn:active { transform: translate(2px,2px); box-shadow: 1px 1px 0 var(--ink); }
+  .btn-primary { background: var(--accent); color: #1a1108; }
+  .btn-danger { background: var(--bad); color: #2a0e0e; }
+  .btn-sm { padding: 6px 10px; font-size: .72rem; box-shadow: 2px 2px 0 var(--ink); }
+  .btn-sm:active { box-shadow: 1px 1px 0 var(--ink); }
+  input[type=text] { background: var(--surface); color: var(--ink); border: 2.5px solid var(--ink); border-radius: 8px;
+    padding: 8px 11px; font-family: var(--font-body); font-size: .85rem; }
+
+  .head-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .cards { display: flex; flex-direction: column; gap: 10px; }
+  .card { background: var(--surface); border: 2.5px solid var(--ink); border-radius: 12px; box-shadow: 5px 5px 0 var(--accent);
+    padding: 12px 16px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+  .card-title { font-weight: 700; font-size: .92rem; margin: 0 0 5px; }
+  .price-row { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .price { font-family: var(--font-mono); font-weight: 700; font-size: 1.05rem; }
+  .store { color: var(--ink-dim); font-size: .78rem; }
+  .chip { font-family: var(--font-mono); font-weight: 700; font-size: .7rem; padding: 4px 9px; border: 2px solid var(--ink); border-radius: 999px; }
+  .chip-good { background: var(--good); color: #062b19; }
+  .chip-bad { background: var(--bad); color: #2a0e0e; }
+  .chip-neutro { background: var(--surface-2); color: var(--ink-dim); }
+  .card-actions { display: flex; gap: 8px; flex-wrap: wrap; flex-shrink: 0; }
+  .card > div:first-child, .slot-card > div:first-child { flex: 1 1 260px; min-width: 0; }
+  .vazio { color: var(--ink-dim); padding: 30px 0; }
+  .status-busca { font-size: .8rem; color: var(--ink-dim); margin-top: 10px; min-height: 1.2em; }
+
+  .em-construcao { color: var(--ink-dim); font-size: .95rem; max-width: 480px; }
+
+  /* ---- Montar PC ---- */
+  .montar-topo { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 18px; }
+  select#select-build { background: var(--surface); color: var(--ink); border: 3px solid var(--ink); border-radius: 8px;
+    padding: 9px 12px; font-family: var(--font-body); font-weight: 700; font-size: .85rem; min-width: 220px; }
+  .vazio-build { color: var(--ink-dim); padding: 30px 0; max-width: 480px; }
+
+  .diagrama-wrap { background: var(--surface-2); border: 2.5px solid var(--ink); border-radius: 14px;
+    padding: 10px; margin-bottom: 14px; display: flex; justify-content: center; }
+  .diagrama-wrap svg { width: 100%; max-width: 480px; height: auto; display: block; }
+  .peca-grupo { cursor: pointer; }
+  .peca-grupo .peca-chip-fundo { fill: var(--surface); stroke: var(--ink-dim); stroke-width: 2; transition: fill .15s, stroke .15s; }
+  .peca-grupo:hover .peca-chip-fundo { stroke: var(--ink); }
+  .peca-grupo.cheia .peca-chip-fundo { fill: var(--accent); stroke: var(--ink); stroke-width: 2.5; }
+  .peca-grupo .peca-leader { stroke: var(--ink-dim); stroke-width: 1.5; stroke-dasharray: 3 3; fill: none; opacity: .6; }
+  .peca-grupo.cheia .peca-leader { stroke: var(--accent); stroke-dasharray: none; stroke-width: 2; opacity: 1; }
+  .peca-grupo .peca-icone { stroke: var(--ink-dim); stroke-width: 1.8; fill: none; }
+  .peca-grupo.cheia .peca-icone { stroke: #1a1108; }
+  .peca-grupo .peca-rotulo { font-family: var(--font-body); font-weight: 700; font-size: 12.5px; fill: var(--ink-dim); }
+  .peca-grupo.cheia .peca-rotulo { fill: var(--ink); font-weight: 800; }
+  .peca-grupo .peca-dot { fill: var(--ink-dim); }
+  .peca-grupo.cheia .peca-dot { fill: var(--good); }
+  .peca-case { fill: var(--surface); stroke: var(--ink); stroke-width: 3; }
+  .peca-case-grade { stroke: var(--ink-dim); stroke-width: 1.5; opacity: .5; }
+
+  .peca-grupo { transform-box: fill-box; transform-origin: center; }
+  /* --dx/--dy = vetor da peça até o CENTRO do gabinete. A peça nasce
+     exatamente em cima do gabinete (fechado) e "sai" voando até o lugar
+     dela -- é o gabinete abrindo e espalhando as peças, não peças
+     chegando de fora pra dentro. */
+  @keyframes pecaMontar {
+    0% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(.25) rotate(-8deg); }
+    55% { opacity: 1; }
+    100% { opacity: 1; transform: translate(0, 0) scale(1) rotate(0deg); }
+  }
+  .peca-grupo.montando { animation: pecaMontar .6s cubic-bezier(.22,.9,.3,1.25) both; }
+  @keyframes pecaDisparar {
+    0% { transform: translate(0,0) scale(1); }
+    40% { transform: translate(calc(var(--dx) * -.45), calc(var(--dy) * -.45)) scale(1.25); }
+    70% { transform: translate(calc(var(--dx) * -.12), calc(var(--dy) * -.12)) scale(.95); }
+    100% { transform: translate(0,0) scale(1); }
+  }
+  .peca-grupo.disparando { animation: pecaDisparar .5s cubic-bezier(.34,1.56,.64,1); }
+  .peca-case { transform-box: fill-box; transform-origin: center; animation: entradaCase .45s ease both; }
+  @keyframes entradaCase {
+    0% { opacity: 0; transform: scale(.8); }
+    55% { opacity: 1; transform: scale(1.05); }
+    75% { transform: scale(.98); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+  .peca-case-flash { fill: var(--accent); opacity: 0; transform-box: fill-box; transform-origin: center; animation: flashAbrir .6s ease both; }
+  @keyframes flashAbrir {
+    0% { opacity: 0; transform: scale(.8); }
+    35% { opacity: .35; transform: scale(1.15); }
+    100% { opacity: 0; transform: scale(1.5); }
+  }
+
+  .slots { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+  .slot-card { background: var(--surface); border: 2.5px solid var(--ink); border-radius: 10px;
+    padding: 10px 14px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+  .slot-card.preenchido { box-shadow: 4px 4px 0 var(--accent); }
+  .slot-rotulo { font-weight: 800; font-size: .88rem; margin: 0 0 3px; }
+  .slot-vazio { color: var(--ink-dim); font-size: .78rem; }
+  .slot-item { color: var(--ink-dim); font-size: .78rem; }
+  .slot-item .price { font-size: .9rem; }
+
+  .compat-card { background: #3a1414; border: 2px solid var(--bad); border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; }
+  .compat-card p { margin: 3px 0; font-size: .78rem; }
+  .compat-titulo { font-weight: 700; color: var(--bad); }
+  .compat-checando { color: var(--ink-dim); font-size: .75rem; margin-bottom: 8px; }
+
+  .rodape-build { background: var(--surface-2); border: 2.5px solid var(--ink); border-radius: 12px;
+    padding: 12px 16px; display: flex; flex-wrap: wrap; gap: 14px; align-items: center; justify-content: space-between;
+    position: sticky; bottom: 0; }
+  .rodape-info p { margin: 0; }
+  .rodape-total { font-family: var(--font-mono); font-weight: 700; font-size: 1.15rem; }
+  .rodape-sub { color: var(--ink-dim); font-size: .78rem; }
+
+  .modal-fundo { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: flex; align-items: center;
+    justify-content: center; z-index: 50; }
+  .modal-caixa { background: var(--surface); border: 2.5px solid var(--ink); border-radius: 12px; box-shadow: 6px 6px 0 var(--accent);
+    padding: 16px; width: 360px; max-width: 90vw; max-height: 80vh; display: flex; flex-direction: column; gap: 8px; }
+  .modal-caixa h3 { margin: 0; }
+  .modal-lista { overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 6px; }
+  .modal-opcao { background: var(--surface-2); border: 2px solid var(--ink); border-radius: 8px; padding: 8px 10px;
+    cursor: pointer; font-size: .82rem; }
+  .modal-opcao:hover, .modal-opcao.selecionada { background: var(--accent); color: #1a1108; }
+  .modal-acoes { display: flex; justify-content: flex-end; gap: 8px; }
+  .modal-caixa-grande { width: 460px; max-height: 88vh; }
+
+  /* ---- Rotinas ---- */
+  .status-tarefa { font-size: .78rem; margin: 0 0 14px; max-width: 700px; }
+  .status-tarefa.ok { color: var(--good); }
+  .status-tarefa.aviso { color: var(--ink-dim); }
+  .rotina-card { background: var(--surface); border: 2.5px solid var(--ink); border-radius: 12px;
+    box-shadow: 5px 5px 0 var(--accent); padding: 12px 16px; display: flex; flex-wrap: wrap; gap: 10px;
+    align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .rotina-card.inativa { box-shadow: 5px 5px 0 var(--surface-2); opacity: .7; }
+  .rotina-info { flex: 1 1 280px; min-width: 0; }
+  .rotina-info p { margin: 2px 0; }
+  .rotina-alvo { font-weight: 800; font-size: .92rem; }
+  .rotina-horario { font-family: var(--font-mono); font-size: .76rem; color: var(--ink-dim); }
+  .rotina-ultima, .rotina-alerta { font-size: .74rem; color: var(--ink-dim); }
+  .vazio-rotinas { color: var(--ink-dim); padding: 30px 0; max-width: 480px; }
+
+  .secao-form { font-weight: 700; font-size: .82rem; color: var(--ink-dim); margin: 10px 0 2px; }
+  .linha-radio { display: flex; align-items: center; gap: 6px; font-size: .85rem; padding: 3px 0; }
+  .linha-radio input[type=radio] { accent-color: var(--accent); }
+  select.select-form { background: var(--surface-2); color: var(--ink); border: 2px solid var(--ink);
+    border-radius: 7px; padding: 6px 9px; font-family: var(--font-body); font-size: .82rem; width: 100%; }
+  .sub-form { padding: 4px 0 4px 20px; }
+  .linha-horario { display: flex; align-items: center; justify-content: space-between; background: var(--surface-2);
+    border: 2px solid var(--ink); border-radius: 7px; padding: 5px 10px; margin-bottom: 4px; font-family: var(--font-mono); font-size: .82rem; }
+  .linha-horario button { background: none; border: none; color: var(--bad); font-weight: 700; cursor: pointer; font-size: .85rem; }
+  .linha-add-horario { display: flex; align-items: center; gap: 4px; margin-top: 4px; }
+  .linha-add-horario select { width: 58px; }
+  .dias-semana { display: flex; gap: 4px; flex-wrap: wrap; padding: 4px 0 4px 20px; }
+  .dia-chip { font-size: .72rem; font-weight: 700; padding: 5px 8px; border: 2px solid var(--ink); border-radius: 6px; cursor: pointer; user-select: none; }
+  .dia-chip.ativo { background: var(--accent); color: #1a1108; }
+  .checkbox-linha { display: flex; align-items: flex-start; gap: 6px; font-size: .85rem; padding: 3px 0; }
+  .checkbox-linha input[type=checkbox] { accent-color: var(--accent); margin-top: 2px; }
+  input[type=text].input-pequeno { width: 90px; padding: 5px 8px; font-size: .8rem; }
+
+  /* ---- Configurações ---- */
+  .card-config { background: var(--surface); border: 2.5px solid var(--ink); border-radius: 12px;
+    box-shadow: 5px 5px 0 var(--accent); padding: 14px 18px; margin-bottom: 14px; max-width: 700px; }
+  .card-config-titulo { font-weight: 800; font-size: .98rem; margin: 0 0 6px; }
+  .card-config-texto { color: var(--ink-dim); font-size: .8rem; margin: 0 0 10px; }
+  .linha-config { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .rotulo-config { font-size: .82rem; color: var(--ink-dim); }
+  select#select-exportar { background: var(--surface-2); color: var(--ink); border: 2px solid var(--ink);
+    border-radius: 7px; padding: 7px 10px; font-family: var(--font-body); font-size: .82rem; }
+
+  /* ---- Histórico de preços ---- */
+  .modal-caixa-historico { width: 720px; max-height: 90vh; }
+  .grafico-historico { background: var(--surface-2); border: 2px solid var(--ink); border-radius: 10px; padding: 6px; }
+  .grafico-historico svg { width: 100%; height: auto; display: block; }
+  .grafico-historico text { font-family: var(--font-mono); font-size: 10px; fill: var(--ink-dim); }
+  .grafico-historico .rotulo-ponto { fill: var(--ink); font-weight: 700; }
+  .grafico-linha { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-linejoin: round; }
+  .grafico-area { fill: var(--accent); opacity: .12; }
+  .grafico-ponto { fill: var(--accent); stroke: var(--ink); stroke-width: 1.5; }
+  .grafico-ponto.menor { fill: var(--good); }
+  .grafico-ponto.maior { fill: var(--bad); }
+  .grafico-grade { stroke: var(--ink-dim); stroke-width: 1; opacity: .25; }
+  .tabela-historico { width: 100%; border-collapse: collapse; font-size: .76rem; }
+  .tabela-historico th { text-align: left; color: var(--ink-dim); font-weight: 700; padding: 4px 8px; position: sticky; top: 0; background: var(--surface); }
+  .tabela-historico td { padding: 5px 8px; border-top: 1px solid rgba(243,239,230,.12); vertical-align: top; }
+  .tabela-historico td.preco { font-family: var(--font-mono); font-weight: 700; white-space: nowrap; text-align: right; }
+  .tabela-historico tr.clicavel { cursor: pointer; }
+  .tabela-historico tr.clicavel:hover td { background: var(--surface-2); }
+  .scroll-historico { overflow-y: auto; max-height: 220px; border: 2px solid var(--ink); border-radius: 8px; }
+  .titulo-secao-grafico { font-weight: 800; font-size: .85rem; margin: 6px 0 0; }
+  .barras-variacao { display: flex; flex-direction: column; gap: 6px; background: var(--surface-2);
+    border: 2px solid var(--ink); border-radius: 10px; padding: 10px 12px; }
+  .linha-barra { display: grid; grid-template-columns: 210px 1fr 90px; gap: 8px; align-items: center; font-size: .74rem; }
+  .linha-barra .rot { color: var(--ink-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .linha-barra .trilho { position: relative; height: 16px; }
+  .linha-barra .zero { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--ink-dim); opacity: .6; }
+  .linha-barra .barra { position: absolute; top: 2px; bottom: 2px; border: 1.5px solid var(--ink); border-radius: 3px; }
+  .linha-barra .barra.verde { background: var(--good); }
+  .linha-barra .barra.vermelho { background: var(--bad); }
+  .linha-barra .barra.neutro { background: var(--ink-dim); }
+  .linha-barra .val { font-family: var(--font-mono); font-weight: 700; text-align: right; }
+  .linha-barra .val.verde { color: var(--good); }
+  .linha-barra .val.vermelho { color: var(--bad); }
+
+  .opcao-importar { display: flex; gap: 8px; align-items: flex-start; padding: 8px 0; cursor: pointer; font-size: .82rem; }
+  .opcao-importar input { margin-top: 3px; accent-color: var(--accent); }
+  .opcao-importar p { margin: 2px 0 0; color: var(--ink-dim); font-size: .76rem; }
+  .opcao-importar .aviso-perigo { color: var(--bad); }
+
+  /* ---- Buscar produto / Adicionar por link ---- */
+  .form-busca { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin-bottom: 10px; }
+  .form-busca .campo { display: flex; flex-direction: column; gap: 4px; }
+  .form-busca .campo.cresce { flex: 1 1 280px; }
+  .form-busca .campo label { font-size: .74rem; color: var(--ink-dim); font-weight: 700; }
+  .form-busca input[type=text] { width: 100%; }
+  .form-busca select.select-form { width: auto; min-width: 190px; padding: 9px 10px; border-width: 2.5px; }
+  .btn:disabled { opacity: .45; cursor: not-allowed; transform: none; box-shadow: 3px 3px 0 var(--ink); }
+  .caixa-sugestao { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; background: var(--surface);
+    border: 2.5px solid var(--ink); border-radius: 10px; box-shadow: 4px 4px 0 var(--accent-2); padding: 10px 14px; margin: 8px 0; font-size: .82rem; }
+  .caixa-sugestao span { flex: 1 1 260px; }
+  .card.resultado { cursor: pointer; }
+  .card.resultado .check-resultado { display: flex; align-items: center; gap: 10px; flex: 1 1 280px; min-width: 0; }
+  .card.resultado input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); flex: 0 0 auto; }
+  .barra-adicionar { position: sticky; bottom: 0; margin-top: 14px; background: var(--surface-2); border: 2.5px solid var(--ink);
+    border-radius: 12px; padding: 10px 14px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+  .barra-adicionar .dica { color: var(--ink-dim); font-size: .74rem; flex: 1 1 260px; }
+  .resultado-link { max-width: 700px; }
+  .resultado-link .titulo-achado { font-weight: 800; margin: 0 0 4px; }
+  .resultado-link .preco-achado { font-family: var(--font-mono); font-weight: 700; font-size: 1.3rem; color: var(--accent); margin: 0 0 10px; }
+
+  .toast { position: fixed; right: 22px; bottom: 22px; z-index: 80; max-width: 380px; background: var(--good); color: #062b19;
+    border: 2.5px solid var(--ink); border-radius: 10px; box-shadow: 5px 5px 0 var(--ink); padding: 10px 14px; font-weight: 700;
+    font-size: .82rem; animation: toastEntra .25s ease both; }
+  @keyframes toastEntra { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+  .barra-progresso { height: 14px; border: 2px solid var(--ink); border-radius: 8px; background: var(--surface-2); overflow: hidden; }
+  .barra-progresso > div { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+  .notas-atualizacao { white-space: pre-wrap; font-size: .76rem; color: var(--ink-dim); max-height: 140px; overflow-y: auto; margin: 0; }
+  .versao-app { margin-top: auto; padding: 14px 12px 0; font-size: .68rem; color: var(--ink-dim); font-family: var(--font-mono); }
+  .nav-item:nth-child(5) { animation-delay: .16s; }
+  .nav-item:nth-child(6) { animation-delay: .2s; }
+</style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">📡 Zandonadi<br><span>Radar</span></div>
+      <div class="nav-item active" data-pagina="busca">🔎 Buscar produto</div>
+      <div class="nav-item" data-pagina="link">🔗 Adicionar por link</div>
+      <div class="nav-item" data-pagina="montar">🛠️ Montar PC</div>
+      <div class="nav-item" data-pagina="rotinas">⏰ Rotinas</div>
+      <div class="nav-item" data-pagina="config">⚙️ Configurações</div>
+      <hr class="divider">
+      <div id="lista-categorias"></div>
+      <div class="versao-app" id="versao-app"></div>
+    </aside>
+
+    <main class="content">
+      <section class="page shown" id="page-busca">
+        <h1 class="titulo">Buscar produto</h1>
+        <div class="form-busca">
+          <div class="campo cresce">
+            <label for="input-termo">O que procurar:</label>
+            <input type="text" id="input-termo" placeholder="Ex.: Ryzen 7 5700X">
+          </div>
+          <div class="campo">
+            <label for="select-categoria-busca">Categoria:</label>
+            <select class="select-form" id="select-categoria-busca"></select>
+          </div>
+          <button class="btn btn-primary" id="btn-buscar">Buscar nas lojas</button>
+          <button class="btn btn-danger" id="btn-parar" disabled>🛑 Parar</button>
+        </div>
+        <div class="caixa-sugestao" id="caixa-sugestao" style="display:none;">
+          <span id="texto-sugestao"></span>
+          <button class="btn btn-sm btn-primary" id="sugestao-sim">Sim, usar</button>
+          <button class="btn btn-sm" id="sugestao-nao">Não, manter</button>
+        </div>
+        <div class="status-busca" id="status-busca"></div>
+        <div class="cards" id="resultados-busca"></div>
+        <div class="barra-adicionar" id="barra-adicionar" style="display:none;">
+          <span class="dica">Marque um ou mais resultados pra adicionar só eles. Verde/vermelho = mais barato/mais caro do que já esteve.</span>
+          <button class="btn btn-sm" id="btn-add-selecionados" disabled>➕ Adicionar selecionado(s)</button>
+          <button class="btn btn-sm btn-primary" id="btn-add-tudo">➕ Adicionar tudo como 1 produto</button>
+        </div>
+      </section>
+
+      <section class="page" id="page-link">
+        <h1 class="titulo">Adicionar produto por link</h1>
+        <p class="card-config-texto">Cole o link da página do produto (KaBuM!, Pichau, Terabyte Shop, Amazon ou Mercado Livre).</p>
+        <div class="form-busca">
+          <div class="campo cresce">
+            <label for="input-url">Link do produto:</label>
+            <input type="text" id="input-url" placeholder="https://...">
+          </div>
+          <div class="campo">
+            <label for="select-categoria-link">Categoria:</label>
+            <select class="select-form" id="select-categoria-link"></select>
+          </div>
+          <button class="btn btn-primary" id="btn-verificar-link">🔍 Verificar link</button>
+        </div>
+        <div class="status-busca" id="status-link"></div>
+        <div class="card-config resultado-link" id="resultado-link" style="display:none;">
+          <p class="titulo-achado" id="titulo-achado"></p>
+          <p class="preco-achado" id="preco-achado"></p>
+          <div class="form-busca" style="margin-bottom:0;">
+            <div class="campo cresce">
+              <label for="input-nome-link">Nome para salvar na lista:</label>
+              <input type="text" id="input-nome-link">
+            </div>
+            <button class="btn btn-primary" id="btn-add-link">➕ Adicionar à lista da categoria</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="page" id="page-categoria">
+        <div class="head-row">
+          <h1 class="titulo" id="titulo-categoria">Categoria</h1>
+          <div class="card-actions">
+            <button class="btn btn-sm" id="btn-cat-buscar">🔎 Buscar novo item nesta categoria</button>
+            <button class="btn btn-sm" id="btn-cat-link">🔗 Adicionar por link</button>
+          </div>
+        </div>
+        <div class="cards" id="lista-produtos"></div>
+      </section>
+
+      <section class="page" id="page-montar">
+        <div class="head-row">
+          <h1 class="titulo">Montar PC</h1>
+        </div>
+        <div class="montar-topo">
+          <select id="select-build"></select>
+          <button class="btn btn-sm btn-primary" id="btn-novo-build">➕ Novo PC</button>
+          <button class="btn btn-sm btn-danger" id="btn-excluir-build">🗑️ Excluir PC</button>
+          <button class="btn btn-sm" id="btn-grafico-build">📊 Histórico / Gráfico</button>
+        </div>
+        <div id="montar-conteudo"></div>
+      </section>
+      <section class="page" id="page-rotinas">
+        <div class="head-row">
+          <h1 class="titulo">Rotinas</h1>
+          <button class="btn btn-sm btn-primary" id="btn-nova-rotina">➕ Nova rotina</button>
+        </div>
+        <p class="status-tarefa" id="status-tarefa-agendada"></p>
+        <div id="lista-rotinas"></div>
+      </section>
+      <section class="page" id="page-config">
+        <h1 class="titulo">Configurações</h1>
+
+        <div class="card-config">
+          <p class="card-config-titulo">🔔 Alertas de queda de preço</p>
+          <p class="card-config-texto">Configure aqui o e-mail que recebe os alertas. Depois, em cada produto da sua lista, clique no 🔔 pra escolher a partir de qual % de queda você quer ser avisado.</p>
+          <div class="linha-config">
+            <span class="rotulo-config">E-mail padrão:</span>
+            <input type="text" id="input-email-alerta" placeholder="seu@email.com" style="flex:1; min-width:220px;">
+            <button class="btn btn-sm" id="btn-salvar-email-alerta">Salvar</button>
+          </div>
+          <p class="status-busca" id="status-email-alerta"></p>
+        </div>
+
+        <div class="card-config">
+          <p class="card-config-titulo">📤 Exportar dados</p>
+          <p class="card-config-texto">Salva seus produtos, histórico de preços e PCs montados num arquivo — pra guardar de backup ou levar pra outro computador.</p>
+          <div class="linha-config">
+            <select id="select-exportar" style="flex:1; min-width:260px;"></select>
+            <button class="btn btn-sm btn-primary" id="btn-exportar">💾 Exportar...</button>
+          </div>
+          <p class="status-busca" id="status-exportar"></p>
+        </div>
+
+        <div class="card-config">
+          <p class="card-config-titulo">📥 Importar dados</p>
+          <p class="card-config-texto">Lê um arquivo exportado daqui (seu ou de outra pessoa) e traz os produtos pra sua lista.</p>
+          <button class="btn btn-sm" id="btn-importar">📂 Importar arquivo...</button>
+          <p class="status-busca" id="status-importar"></p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal-fundo" id="modal-slot" style="display:none;">
+    <div class="modal-caixa">
+      <h3 id="modal-slot-titulo">Selecionar peça</h3>
+      <p class="status-busca" id="modal-slot-status"></p>
+      <div class="modal-lista" id="modal-slot-lista"></div>
+      <div class="modal-acoes">
+        <button class="btn btn-sm" id="modal-slot-cancelar">Cancelar</button>
+        <button class="btn btn-sm btn-primary" id="modal-slot-confirmar">Usar este item</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-fundo" id="modal-rotina" style="display:none;">
+    <div class="modal-caixa modal-caixa-grande">
+      <h3 id="rotina-modal-titulo">Nova rotina</h3>
+      <div class="modal-lista" id="rotina-modal-corpo"></div>
+      <p class="status-busca" id="rotina-modal-status"></p>
+      <div class="modal-acoes">
+        <button class="btn btn-sm" id="rotina-modal-cancelar">Cancelar</button>
+        <button class="btn btn-sm btn-primary" id="rotina-modal-salvar">Criar rotina</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-fundo" id="modal-historico" style="display:none;">
+    <div class="modal-caixa modal-caixa-historico">
+      <h3 id="historico-titulo">Histórico</h3>
+      <div id="historico-corpo" style="display:flex; flex-direction:column; gap:8px; overflow-y:auto;"></div>
+      <div class="modal-acoes">
+        <button class="btn btn-sm" id="historico-fechar">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-fundo" id="modal-grafico-build" style="display:none;">
+    <div class="modal-caixa modal-caixa-historico">
+      <h3 id="grafico-build-titulo">Gráfico</h3>
+      <div id="grafico-build-corpo" style="display:flex; flex-direction:column; gap:8px; overflow-y:auto;"></div>
+      <div class="modal-acoes">
+        <button class="btn btn-sm" id="grafico-build-fechar">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-fundo" id="modal-nome" style="display:none;">
+    <div class="modal-caixa">
+      <h3>Nome do produto</h3>
+      <p class="card-config-texto" style="margin:0;">Como você quer chamar esse item na sua lista?</p>
+      <input type="text" id="input-nome-produto">
+      <p class="status-busca" id="nome-status"></p>
+      <div class="modal-acoes">
+        <button class="btn btn-sm" id="nome-cancelar">Cancelar</button>
+        <button class="btn btn-sm btn-primary" id="nome-confirmar">Adicionar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-fundo" id="modal-atualizacao" style="display:none;">
+    <div class="modal-caixa">
+      <h3>Nova versão disponível!</h3>
+      <p class="card-config-texto" id="atualizacao-texto" style="margin:0;"></p>
+      <p class="notas-atualizacao" id="atualizacao-notas"></p>
+      <div class="barra-progresso" id="atualizacao-progresso" style="display:none;"><div id="atualizacao-barra"></div></div>
+      <p class="status-busca" id="atualizacao-status"></p>
+      <div class="modal-acoes">
+        <button class="btn btn-sm" id="atualizacao-depois">Agora não</button>
+        <button class="btn btn-sm btn-primary" id="atualizacao-instalar">Baixar e instalar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-fundo" id="modal-alerta" style="display:none;">
+    <div class="modal-caixa">
+      <h3>Alerta de queda de preço</h3>
+      <p class="card-title" id="alerta-nome-produto"></p>
+      <label class="checkbox-linha">
+        <input type="checkbox" id="alerta-ativo">
+        <span>Avisar por e-mail quando o preço cair pelo menos:</span>
+      </label>
+      <div class="sub-form" id="alerta-linha-pct" style="display:none;">
+        <input type="text" class="input-pequeno" id="alerta-pct" style="width:70px;"> <span class="rotulo-config">%  (em relação ao menor preço já visto)</span>
+      </div>
+      <p class="status-busca" id="alerta-status"></p>
+      <div class="modal-acoes">
+        <button class="btn btn-sm" id="alerta-cancelar">Cancelar</button>
+        <button class="btn btn-sm btn-primary" id="alerta-salvar">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-fundo" id="modal-importar" style="display:none;">
+    <div class="modal-caixa">
+      <h3>Como importar?</h3>
+      <p class="status-busca" id="importar-modal-resumo"></p>
+      <label class="opcao-importar">
+        <input type="radio" name="modo-importar" value="somar" checked>
+        <div>
+          <strong>Somar aos que já tenho</strong>
+          <p>Os itens do arquivo entram como novos, sem mexer no que você já tem cadastrado.</p>
+        </div>
+      </label>
+      <label class="opcao-importar">
+        <input type="radio" name="modo-importar" value="substituir">
+        <div>
+          <strong>Substituir tudo que eu tenho</strong>
+          <p class="aviso-perigo">⚠️ Apaga TODOS os seus produtos, histórico e PCs montados atuais.</p>
+        </div>
+      </label>
+      <div class="modal-acoes">
+        <button class="btn btn-sm" id="importar-modal-cancelar">Cancelar</button>
+        <button class="btn btn-sm btn-primary" id="importar-modal-confirmar">Importar</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+let categoriaAtual = null;
+let resultadosAtuais = [];
+
+function mostrarPagina(pagina) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('shown'));
+  document.getElementById('page-' + pagina).classList.add('shown');
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.pagina === pagina));
+  document.querySelectorAll('.cat-item').forEach(n => n.classList.remove('current'));
+}
+
+document.querySelectorAll('.nav-item').forEach(el => {
+  el.addEventListener('click', () => {
+    mostrarPagina(el.dataset.pagina);
+    if (el.dataset.pagina === 'montar') carregarBuilds(buildAtualId);
+    if (el.dataset.pagina === 'rotinas') carregarRotinas();
+    if (el.dataset.pagina === 'config') carregarConfiguracoes();
+  });
+});
+
+async function carregarSidebar() {
+  let cats;
+  try {
+    cats = await window.pywebview.api.listar_categorias();
+  } catch (erro) {
+    document.getElementById('lista-categorias').innerHTML =
+      `<div style="color:#ff6b6b; font-size:11px; padding:8px;">ERRO: ${erro}</div>`;
+    return;
+  }
+  const container = document.getElementById('lista-categorias');
+  let indice = 0;
+  let html = '<div class="cat-label">Categorias (PC)</div>';
+  cats.pc.forEach(c => {
+    html += `<div class="cat-item" data-chave="${c.chave}" style="animation-delay:${indice * 35}ms">${c.rotulo}</div>`;
+    indice++;
+  });
+  html += '<hr class="divider"><div class="cat-label">Eletrodomésticos e Móveis</div>';
+  cats.casa.forEach(c => {
+    html += `<div class="cat-item" data-chave="${c.chave}" style="animation-delay:${indice * 35}ms">${c.rotulo}</div>`;
+    indice++;
+  });
+  container.innerHTML = html;
+  container.querySelectorAll('.cat-item').forEach(el => {
+    el.addEventListener('click', () => abrirCategoria(el.dataset.chave, el.textContent));
+  });
+
+  const opcoes = [...cats.pc, ...cats.casa].map(c => `<option value="${c.chave}">${esc(c.rotulo)}</option>`).join('');
+  document.getElementById('select-categoria-busca').innerHTML = opcoes;
+  document.getElementById('select-categoria-link').innerHTML = opcoes;
+}
+
+function mostrarToast(texto) {
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.textContent = texto;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 5000);
+}
+
+function rotuloDaCategoria(chave) {
+  const opt = document.querySelector(`#select-categoria-busca option[value="${chave}"]`);
+  return opt ? opt.textContent : chave;
+}
+
+function formatarPreco(v) {
+  return 'R$ ' + v.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d)(?=.*,))/g, '.');
+}
+
+function chipVariacao(resumo) {
+  if (!resumo) return '';
+  if (resumo.status === 'verde') return `<span class="chip chip-good">▼ ${resumo.percentual ?? ''}% mais barato</span>`;
+  if (resumo.status === 'vermelho') return `<span class="chip chip-bad">▲ ${resumo.percentual ?? ''}% mais caro</span>`;
+  return `<span class="chip chip-neutro">primeira vez / estável</span>`;
+}
+
+// Títulos/lojas vêm de páginas de terceiros (scraping) -- sempre escapar antes de
+// colocar em innerHTML, senão um título malicioso poderia rodar JS com acesso à API.
+function esc(valor) {
+  return String(valor ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+}
+
+async function abrirUrl(url) {
+  if (!url) { alert('Esse registro não tem um link salvo.'); return; }
+  await window.pywebview.api.abrir_url(url);
+}
+
+let produtosCategoriaAtual = [];
+
+async function abrirCategoria(chave, rotulo) {
+  categoriaAtual = chave;
+  mostrarPagina('categoria');
+  document.querySelectorAll('.cat-item').forEach(n => n.classList.toggle('current', n.dataset.chave === chave));
+  document.getElementById('titulo-categoria').textContent = rotulo;
+  const lista = document.getElementById('lista-produtos');
+  lista.innerHTML = '<p class="vazio">Carregando...</p>';
+  const produtos = await window.pywebview.api.listar_produtos(chave);
+  produtosCategoriaAtual = produtos;
+  if (!produtos.length) {
+    lista.innerHTML = '<p class="vazio">Nenhum produto cadastrado nesta categoria ainda.</p>';
+    return;
+  }
+  lista.innerHTML = produtos.map(p => `
+    <article class="card" data-id="${p.id}">
+      <div>
+        <p class="card-title">${esc(p.nome)}</p>
+        ${p.resumo ? `
+          <div class="price-row">
+            <span class="price">${formatarPreco(p.resumo.preco)}</span>
+            <span class="store">na ${esc(p.resumo.loja)}</span>
+            ${chipVariacao(p.resumo)}
+          </div>` : '<p class="store">Sem preços registrados ainda.</p>'}
+      </div>
+      <div class="card-actions">
+        <button class="btn btn-sm btn-primary" onclick="atualizarPreco(${p.id})">🔄 Atualizar</button>
+        <button class="btn btn-sm" onclick="abrirHistorico(${p.id})">📈 Histórico</button>
+        <button class="btn btn-sm" title="Alerta de queda de preço" onclick="abrirDialogoAlerta(${p.id})">${p.alerta_queda_percentual ? '🔔' : '🔕'}</button>
+        <button class="btn btn-sm btn-danger" onclick="removerProduto(${p.id})">🗑️</button>
+      </div>
+    </article>
+  `).join('');
+}
+
+// ---------- Histórico de preços ----------
+let historicoLinhas = [];
+
+function dataCurta(s) {
+  const m = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})/.exec(s || '');
+  return m ? `${m[3]}/${m[2]} ${m[4]}:${m[5]}` : (s || '');
+}
+
+function precoCompacto(v) {
+  return 'R$ ' + Math.round(v).toLocaleString('pt-BR');
+}
+
+// Menor preço de cada rodada de busca ao longo do tempo (mesma ideia do gráfico do Tkinter).
+function graficoHistoricoSVG(pontos) {
+  const W = 680, H = 240, mE = 66, mD = 34, mT = 30, mB = 38;
+  const precos = pontos.map(p => p.preco);
+  let min = Math.min(...precos), max = Math.max(...precos);
+  if (max === min) { min *= 0.97; max *= 1.03; }
+  const folga = (max - min) * 0.22;
+  const yMin = min - folga, yMax = max + folga;
+  const tempos = pontos.map(p => new Date(p.data.replace(' ', 'T')).getTime());
+  const t0 = tempos[0], t1 = tempos[tempos.length - 1];
+  const largura = W - mE - mD;
+  const x = i => mE + (t1 === t0 ? largura / 2 : (tempos[i] - t0) / (t1 - t0) * largura);
+  const y = v => mT + (H - mT - mB) * (1 - (v - yMin) / (yMax - yMin));
+
+  const grade = [0, 1, 2, 3].map(k => {
+    const v = yMin + (yMax - yMin) * k / 3;
+    return `<line class="grafico-grade" x1="${mE}" y1="${y(v)}" x2="${W - mD}" y2="${y(v)}"/>
+            <text x="${mE - 8}" y="${y(v) + 3}" text-anchor="end">${precoCompacto(v)}</text>`;
+  }).join('');
+
+  const caminho = pontos.map((p, i) => `${i ? 'L' : 'M'} ${x(i)} ${y(p.preco)}`).join(' ');
+  const area = `${caminho} L ${x(pontos.length - 1)} ${H - mB} L ${x(0)} ${H - mB} Z`;
+
+  const iMenor = precos.indexOf(Math.min(...precos));
+  const iMaior = precos.indexOf(Math.max(...precos));
+  const destaque = [...new Set([0, pontos.length - 1, iMenor, iMaior])].sort((a, b) => a - b);
+  const rotulos = destaque.map((idx, ordem) => {
+    const acima = (idx === iMaior && iMaior !== iMenor) ? true : ((idx === iMenor && iMaior !== iMenor) ? false : ordem % 2 === 0);
+    const px = x(idx);
+    const ancora = px < mE + 40 ? 'start' : (px > W - mD - 40 ? 'end' : 'middle');
+    return `<text class="rotulo-ponto" x="${px}" y="${y(pontos[idx].preco) + (acima ? -10 : 18)}" text-anchor="${ancora}">${formatarPreco(pontos[idx].preco)}</text>`;
+  }).join('');
+
+  const bolinhas = pontos.map((p, i) => {
+    const classe = (i === iMenor && iMenor !== iMaior) ? 'menor' : ((i === iMaior && iMenor !== iMaior) ? 'maior' : '');
+    return `<circle class="grafico-ponto ${classe}" cx="${x(i)}" cy="${y(p.preco)}" r="4.5"/>`;
+  }).join('');
+
+  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
+    ${grade}
+    <path class="grafico-area" d="${area}"/>
+    <path class="grafico-linha" d="${caminho}"/>
+    ${bolinhas}${rotulos}
+    <text x="${mE}" y="${H - 12}" text-anchor="start">${dataCurta(pontos[0].data)}</text>
+    <text x="${W - mD}" y="${H - 12}" text-anchor="end">${dataCurta(pontos[pontos.length - 1].data)}</text>
+  </svg>`;
+}
+
+async function abrirHistorico(id) {
+  const dados = await window.pywebview.api.obter_historico(id);
+  historicoLinhas = dados ? dados.historico : [];
+  document.getElementById('historico-titulo').textContent = 'Histórico — ' + (dados ? dados.produto.nome : '');
+  const corpo = document.getElementById('historico-corpo');
+
+  if (!historicoLinhas.length) {
+    corpo.innerHTML = '<p class="vazio" style="padding:10px 0;">Sem histórico ainda.</p>';
+    document.getElementById('modal-historico').style.display = 'flex';
+    return;
+  }
+
+  const lotes = new Map();
+  historicoLinhas.forEach(h => {
+    if (!lotes.has(h.buscado_em) || h.preco < lotes.get(h.buscado_em)) lotes.set(h.buscado_em, h.preco);
+  });
+  const pontos = [...lotes.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([data, preco]) => ({data, preco}));
+
+  let blocoGrafico = '';
+  if (pontos.length >= 2) {
+    blocoGrafico = `<div class="grafico-historico">${graficoHistoricoSVG(pontos)}</div>`;
+  } else {
+    blocoGrafico = '<p class="store">Só há uma busca registrada ainda — atualize os preços de novo para ver o gráfico.</p>';
+  }
+
+  corpo.innerHTML = `
+    ${blocoGrafico}
+    <p class="store">Clique numa linha pra abrir o anúncio no navegador.</p>
+    <div class="scroll-historico">
+      <table class="tabela-historico">
+        <thead><tr><th>Buscado em</th><th>Loja</th><th style="text-align:right;">Preço</th><th>Título encontrado</th></tr></thead>
+        <tbody>
+          ${historicoLinhas.map((h, i) => `
+            <tr class="clicavel" onclick="abrirUrl(historicoLinhas[${i}].url)">
+              <td>${esc(dataCurta(h.buscado_em))}</td><td>${esc(h.loja)}</td>
+              <td class="preco">${formatarPreco(h.preco)}</td><td>${esc(h.titulo)}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+  document.getElementById('modal-historico').style.display = 'flex';
+}
+
+document.getElementById('historico-fechar').addEventListener('click', () => {
+  document.getElementById('modal-historico').style.display = 'none';
+});
+
+// ---------- Alerta de queda de preço por produto ----------
+let alertaProdutoId = null;
+
+function abrirDialogoAlerta(id) {
+  const produto = produtosCategoriaAtual.find(p => p.id === id);
+  if (!produto) return;
+  alertaProdutoId = id;
+  const atual = produto.alerta_queda_percentual;
+  document.getElementById('alerta-nome-produto').textContent = produto.nome;
+  document.getElementById('alerta-ativo').checked = atual != null;
+  document.getElementById('alerta-pct').value = atual ? String(Math.round(atual)) : '10';
+  document.getElementById('alerta-linha-pct').style.display = atual != null ? 'block' : 'none';
+  document.getElementById('alerta-status').textContent = '';
+  document.getElementById('modal-alerta').style.display = 'flex';
+}
+
+document.getElementById('alerta-ativo').addEventListener('change', (e) => {
+  document.getElementById('alerta-linha-pct').style.display = e.target.checked ? 'block' : 'none';
+});
+document.getElementById('alerta-cancelar').addEventListener('click', () => {
+  document.getElementById('modal-alerta').style.display = 'none';
+});
+document.getElementById('alerta-salvar').addEventListener('click', async () => {
+  const ativo = document.getElementById('alerta-ativo').checked;
+  const pct = ativo ? document.getElementById('alerta-pct').value : null;
+  const resultado = await window.pywebview.api.definir_alerta_produto(alertaProdutoId, pct);
+  if (!resultado.ok) {
+    document.getElementById('alerta-status').textContent = resultado.erro;
+    return;
+  }
+  document.getElementById('modal-alerta').style.display = 'none';
+  if (resultado.aviso) alert(resultado.aviso);
+  abrirCategoria(categoriaAtual, document.getElementById('titulo-categoria').textContent);
+});
+
+async function atualizarPreco(id) {
+  const card = document.querySelector(`.card[data-id="${id}"]`);
+  if (card) card.style.opacity = '0.5';
+  await window.pywebview.api.atualizar_preco_produto(id);
+}
+
+function onPrecoAtualizado(dados) {
+  if (categoriaAtual) abrirCategoria(categoriaAtual, document.getElementById('titulo-categoria').textContent);
+}
+
+async function removerProduto(id) {
+  await window.pywebview.api.remover_produto(id);
+  abrirCategoria(categoriaAtual, document.getElementById('titulo-categoria').textContent);
+}
+
+// ---------- Buscar produto ----------
+let buscaAtiva = false;
+let termoUltimaBusca = '';
+
+function definirBuscando(sim) {
+  buscaAtiva = sim;
+  const btn = document.getElementById('btn-buscar');
+  btn.disabled = sim;
+  btn.textContent = sim ? 'Buscando...' : 'Buscar nas lojas';
+  document.getElementById('btn-parar').disabled = !sim;
+}
+
+function esconderSugestao() {
+  document.getElementById('caixa-sugestao').style.display = 'none';
+}
+
+async function iniciarBusca(pularSugestao, termoForcado) {
+  const campo = document.getElementById('input-termo');
+  const termo = (termoForcado ?? campo.value).trim();
+  const status = document.getElementById('status-busca');
+  if (!termo) { status.textContent = 'Digite o que você quer buscar.'; return; }
+  campo.value = termo;
+  esconderSugestao();
+  resultadosAtuais = [];
+  document.getElementById('resultados-busca').innerHTML = '';
+  document.getElementById('barra-adicionar').style.display = 'none';
+  definirBuscando(true);
+  status.textContent = 'Buscando nas lojas, aguarde...';
+  const r = await window.pywebview.api.buscar(termo, document.getElementById('select-categoria-busca').value, pularSugestao);
+  if (!r.ok) { definirBuscando(false); status.textContent = r.erro; }
+}
+
+document.getElementById('btn-buscar').addEventListener('click', () => iniciarBusca(false));
+document.getElementById('input-termo').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !buscaAtiva) iniciarBusca(false); });
+
+document.getElementById('btn-parar').addEventListener('click', async () => {
+  await window.pywebview.api.parar_busca();
+  definirBuscando(false);
+  document.getElementById('status-busca').textContent = 'Busca cancelada.';
+});
+
+function onSugestaoBusca(dados) {
+  definirBuscando(false);
+  document.getElementById('status-busca').textContent = '';
+  document.getElementById('texto-sugestao').textContent = `💡 Sugestão do assistente: buscar por “${dados.sugestao}” em vez de “${dados.termo}”?`;
+  document.getElementById('sugestao-sim').onclick = () => iniciarBusca(true, dados.sugestao);
+  document.getElementById('sugestao-nao').onclick = () => iniciarBusca(true, dados.termo);
+  document.getElementById('caixa-sugestao').style.display = 'flex';
+}
+
+function onProgressoBusca(dados) {
+  if (!buscaAtiva) return;
+  document.getElementById('status-busca').textContent = `[${dados.loja}] ${dados.status}`;
+}
+
+function chipResultado(status) {
+  if (status === 'verde') return '<span class="chip chip-good">▼ mais barato do que já esteve</span>';
+  if (status === 'vermelho') return '<span class="chip chip-bad">▲ mais caro do que já esteve</span>';
+  return '';
+}
+
+function atualizarBotoesAdicionar() {
+  document.getElementById('btn-add-selecionados').disabled = !document.querySelector('.chk-resultado:checked');
+}
+
+function onBuscaConcluida(dados) {
+  definirBuscando(false);
+  resultadosAtuais = dados.resultados;
+  termoUltimaBusca = dados.termo;
+  const status = document.getElementById('status-busca');
+  if (!dados.resultados.length) {
+    status.textContent = 'Nenhum resultado encontrado. Tente um termo mais simples (ex.: sem o código do fabricante) ou verifique sua internet.';
+    return;
+  }
+  status.textContent = `${dados.resultados.length} resultado(s) encontrado(s) para “${dados.termo}”.`;
+  document.getElementById('resultados-busca').innerHTML = dados.resultados.map((r, i) => `
+    <label class="card resultado">
+      <div class="check-resultado">
+        <input type="checkbox" class="chk-resultado" value="${i}" onchange="atualizarBotoesAdicionar()">
+        <div style="min-width:0;">
+          <p class="card-title">${esc(r.titulo)}</p>
+          <div class="price-row"><span class="price">${formatarPreco(r.preco)}</span><span class="store">${esc(r.loja)}</span>${chipResultado(r.status_preco)}</div>
+        </div>
+      </div>
+      <div class="card-actions"><button class="btn btn-sm" onclick="event.preventDefault(); abrirUrl(resultadosAtuais[${i}].url)">🔗 Abrir</button></div>
+    </label>
+  `).join('');
+  atualizarBotoesAdicionar();
+  document.getElementById('barra-adicionar').style.display = 'flex';
+}
+
+function onBuscaErro(dados) {
+  definirBuscando(false);
+  document.getElementById('status-busca').textContent = 'Erro: ' + dados.mensagem;
+}
+
+document.getElementById('btn-add-selecionados').addEventListener('click', async () => {
+  const indices = [...document.querySelectorAll('.chk-resultado:checked')].map(c => parseInt(c.value, 10));
+  if (!indices.length) return;
+  const chave = document.getElementById('select-categoria-busca').value;
+  const r = await window.pywebview.api.adicionar_selecionados(chave, indices);
+  if (!r.ok) { document.getElementById('status-busca').textContent = 'Não consegui adicionar esses itens.'; return; }
+  mostrarToast(`${r.nomes.length} item(ns) adicionado(s) em ${rotuloDaCategoria(chave)}, cada um como produto separado.`);
+  abrirCategoria(chave, rotuloDaCategoria(chave));
+});
+
+// "Adicionar tudo como 1 produto" pede um nome antes
+document.getElementById('btn-add-tudo').addEventListener('click', () => {
+  document.getElementById('input-nome-produto').value = termoUltimaBusca;
+  document.getElementById('nome-status').textContent = '';
+  document.getElementById('modal-nome').style.display = 'flex';
+  document.getElementById('input-nome-produto').focus();
+});
+document.getElementById('nome-cancelar').addEventListener('click', () => {
+  document.getElementById('modal-nome').style.display = 'none';
+});
+document.getElementById('nome-confirmar').addEventListener('click', async () => {
+  const chave = document.getElementById('select-categoria-busca').value;
+  const r = await window.pywebview.api.adicionar_tudo_como_produto(chave, document.getElementById('input-nome-produto').value);
+  if (!r.ok) { document.getElementById('nome-status').textContent = r.erro; return; }
+  document.getElementById('modal-nome').style.display = 'none';
+  mostrarToast(`“${r.nome}” foi adicionado em ${rotuloDaCategoria(chave)} (${r.qtd} preços salvos no histórico).`);
+  abrirCategoria(chave, rotuloDaCategoria(chave));
+});
+
+// ---------- Adicionar por link ----------
+let verificandoLink = false;
+
+function definirVerificandoLink(sim) {
+  verificandoLink = sim;
+  const btn = document.getElementById('btn-verificar-link');
+  btn.disabled = sim;
+  btn.textContent = sim ? 'Verificando...' : '🔍 Verificar link';
+}
+
+async function verificarLink() {
+  const status = document.getElementById('status-link');
+  document.getElementById('resultado-link').style.display = 'none';
+  const r = await window.pywebview.api.verificar_link(document.getElementById('input-url').value);
+  if (!r.ok) { status.textContent = r.erro; return; }
+  definirVerificandoLink(true);
+  status.textContent = 'Lendo a página do produto, aguarde (pode demorar um pouco)...';
+}
+
+document.getElementById('btn-verificar-link').addEventListener('click', verificarLink);
+document.getElementById('input-url').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !verificandoLink) verificarLink(); });
+
+function onProgressoLink(dados) {
+  if (verificandoLink) document.getElementById('status-link').textContent = `[${dados.loja}] ${dados.status}`;
+}
+
+function onLinkVerificado(dados) {
+  definirVerificandoLink(false);
+  const status = document.getElementById('status-link');
+  if (!dados.ok) {
+    status.textContent = 'Não consegui ler um preço nesse link. Confira se é a página de um produto (não de busca/categoria) e tente de novo.';
+    return;
+  }
+  status.textContent = `Encontrado na ${dados.item.loja}.`;
+  document.getElementById('titulo-achado').textContent = dados.item.titulo;
+  document.getElementById('preco-achado').textContent = formatarPreco(dados.item.preco);
+  document.getElementById('input-nome-link').value = dados.item.titulo.slice(0, 70);
+  document.getElementById('resultado-link').style.display = 'block';
+}
+
+document.getElementById('btn-add-link').addEventListener('click', async () => {
+  const chave = document.getElementById('select-categoria-link').value;
+  const r = await window.pywebview.api.adicionar_por_link(chave, document.getElementById('input-nome-link').value);
+  if (!r.ok) { document.getElementById('status-link').textContent = r.erro; return; }
+  document.getElementById('resultado-link').style.display = 'none';
+  document.getElementById('input-url').value = '';
+  document.getElementById('status-link').textContent = '';
+  mostrarToast(`“${r.nome}” foi adicionado em ${rotuloDaCategoria(chave)}. Use “🔄 Atualizar” na lista pra conferir a variação desse mesmo link depois.`);
+  abrirCategoria(chave, rotuloDaCategoria(chave));
+});
+
+// Atalhos da página de categoria: abrem Buscar/Link já com a categoria escolhida
+document.getElementById('btn-cat-buscar').addEventListener('click', () => {
+  document.getElementById('select-categoria-busca').value = categoriaAtual;
+  mostrarPagina('busca');
+  document.getElementById('input-termo').focus();
+});
+document.getElementById('btn-cat-link').addEventListener('click', () => {
+  document.getElementById('select-categoria-link').value = categoriaAtual;
+  mostrarPagina('link');
+  document.getElementById('input-url').focus();
+});
+
+function onRotinasAtualizadas() {
+  if (document.getElementById('page-rotinas').classList.contains('shown')) carregarRotinas();
+}
+
+// ---------- Atualização automática ----------
+async function checarAtualizacao() {
+  let info = null;
+  try { info = await window.pywebview.api.verificar_atualizacao(); } catch (e) { return; }
+  if (!info) return;
+  document.getElementById('atualizacao-texto').textContent =
+    `Tem uma versão nova do Zandonadi Radar: ${info.versao} (você está na ${info.versao_atual}). Baixar e instalar agora? O programa vai fechar durante a instalação.`;
+  document.getElementById('atualizacao-notas').textContent = info.notas || '';
+  document.getElementById('atualizacao-status').textContent = '';
+  document.getElementById('atualizacao-progresso').style.display = 'none';
+  document.getElementById('atualizacao-instalar').disabled = false;
+  document.getElementById('modal-atualizacao').style.display = 'flex';
+}
+
+document.getElementById('atualizacao-depois').addEventListener('click', () => {
+  document.getElementById('modal-atualizacao').style.display = 'none';
+});
+document.getElementById('atualizacao-instalar').addEventListener('click', async () => {
+  document.getElementById('atualizacao-instalar').disabled = true;
+  document.getElementById('atualizacao-status').textContent = 'Baixando...';
+  document.getElementById('atualizacao-barra').style.width = '0%';
+  document.getElementById('atualizacao-progresso').style.display = 'block';
+  await window.pywebview.api.instalar_atualizacao();
+});
+
+function onProgressoAtualizacao(dados) {
+  document.getElementById('atualizacao-barra').style.width = dados.pct + '%';
+  document.getElementById('atualizacao-status').textContent = `Baixando... ${dados.pct}%`;
+}
+
+function onFalhaAtualizacao(dados) {
+  document.getElementById('atualizacao-status').textContent = `${dados.mensagem} Baixe manualmente em: ${dados.url_release}`;
+  document.getElementById('atualizacao-instalar').disabled = false;
+}
+
+// ================= Montar PC =================
+let buildsCache = [];
+let buildAtualId = null;
+let modalSlotCategoria = null;
+let modalSlotProdutos = [];
+let modalSlotSelecionado = null;
+
+const ORDEM_CATEGORIAS_DIAGRAMA = [
+  'processador', 'placa_mae', 'memoria_ram', 'placa_video', 'ssd', 'fonte', 'gabinete', 'water_cooler', 'monitor',
+];
+
+const LAYOUT_DIAGRAMA = {
+  water_cooler: { cx: 90, cy: 75, ax: 380, ay: 70, lado: 'esq' },
+  processador: { cx: 90, cy: 155, ax: 380, ay: 140, lado: 'esq' },
+  memoria_ram: { cx: 90, cy: 235, ax: 380, ay: 210, lado: 'esq' },
+  ssd: { cx: 90, cy: 315, ax: 380, ay: 280, lado: 'esq' },
+  gabinete: { cx: 90, cy: 395, ax: 380, ay: 370, lado: 'esq' },
+  monitor: { cx: 830, cy: 75, ax: 540, ay: 70, lado: 'dir' },
+  placa_mae: { cx: 830, cy: 165, ax: 540, ay: 160, lado: 'dir' },
+  placa_video: { cx: 830, cy: 255, ax: 540, ay: 250, lado: 'dir' },
+  fonte: { cx: 830, cy: 345, ax: 540, ay: 320, lado: 'dir' },
+};
+
+function iconeParte(cat, cx, cy) {
+  switch (cat) {
+    case 'processador': return `
+      <rect x="${cx-12}" y="${cy-12}" width="24" height="24" rx="2" fill="url(#gradDark)"/>
+      <rect x="${cx-7}" y="${cy-7}" width="14" height="14" rx="1" fill="url(#gradMetal)"/>
+      <path d="M ${cx-12} ${cy-12} l 6 0 l 0 6 z" fill="url(#gradGold)"/>
+      <line x1="${cx-6}" y1="${cy-12}" x2="${cx-6}" y2="${cy-18}"/>
+      <line x1="${cx}" y1="${cy-12}" x2="${cx}" y2="${cy-18}"/>
+      <line x1="${cx+6}" y1="${cy-12}" x2="${cx+6}" y2="${cy-18}"/>
+      <line x1="${cx-6}" y1="${cy+12}" x2="${cx-6}" y2="${cy+18}"/>
+      <line x1="${cx}" y1="${cy+12}" x2="${cx}" y2="${cy+18}"/>
+      <line x1="${cx+6}" y1="${cy+12}" x2="${cx+6}" y2="${cy+18}"/>
+      <line x1="${cx-12}" y1="${cy-6}" x2="${cx-18}" y2="${cy-6}"/>
+      <line x1="${cx-12}" y1="${cy}" x2="${cx-18}" y2="${cy}"/>
+      <line x1="${cx-12}" y1="${cy+6}" x2="${cx-18}" y2="${cy+6}"/>
+      <line x1="${cx+12}" y1="${cy-6}" x2="${cx+18}" y2="${cy-6}"/>
+      <line x1="${cx+12}" y1="${cy}" x2="${cx+18}" y2="${cy}"/>
+      <line x1="${cx+12}" y1="${cy+6}" x2="${cx+18}" y2="${cy+6}"/>`;
+    case 'placa_mae': return `
+      <rect x="${cx-15}" y="${cy-15}" width="30" height="30" rx="2" fill="url(#gradPcb)"/>
+      <rect x="${cx-11}" y="${cy-11}" width="9" height="9" rx="1" fill="url(#gradDark)"/>
+      <circle cx="${cx-9}" cy="${cy-9}" r="0.8" fill="#ffd77a"/>
+      <circle cx="${cx-5}" cy="${cy-9}" r="0.8" fill="#ffd77a"/>
+      <circle cx="${cx-9}" cy="${cy-5}" r="0.8" fill="#ffd77a"/>
+      <circle cx="${cx-5}" cy="${cy-5}" r="0.8" fill="#ffd77a"/>
+      <rect x="${cx+2}" y="${cy-11}" width="4" height="11" fill="url(#gradDark)"/>
+      <rect x="${cx+8}" y="${cy-11}" width="4" height="11" fill="url(#gradDark)"/>
+      <rect x="${cx+2}" y="${cy+2}" width="10" height="7" rx="1" fill="url(#gradMetal)"/>
+      <rect x="${cx-11}" y="${cy+6}" width="14" height="3" fill="url(#gradDark)"/>`;
+    case 'memoria_ram': return `
+      <rect x="${cx-6}" y="${cy-15}" width="12" height="30" rx="1" fill="url(#gradPcb)"/>
+      <rect x="${cx-6}" y="${cy-15}" width="12" height="17" rx="1" fill="url(#gradDark)"/>
+      <rect x="${cx-5}" y="${cy-8}" width="10" height="1.6" fill="var(--accent)"/>
+      <rect x="${cx-6}" y="${cy+11}" width="12" height="4" fill="url(#gradGold)"/>`;
+    case 'placa_video': return `
+      <rect x="${cx-17}" y="${cy-10}" width="34" height="20" rx="3" fill="url(#gradDark)"/>
+      <rect x="${cx-17}" y="${cy+7}" width="34" height="4" fill="url(#gradPcb)"/>
+      <circle cx="${cx-8}" cy="${cy-1}" r="6" fill="none"/>
+      <circle cx="${cx-8}" cy="${cy-1}" r="1.4" fill="url(#gradMetal)"/>
+      <path d="M ${cx-8} ${cy-7} L ${cx-8} ${cy+5} M ${cx-14} ${cy-1} L ${cx-2} ${cy-1} M ${cx-12.2} ${cy-5.2} L ${cx-3.8} ${cy+3.2} M ${cx-12.2} ${cy+3.2} L ${cx-3.8} ${cy-5.2}" stroke-width="1.1"/>
+      <circle cx="${cx+8}" cy="${cy-1}" r="6" fill="none"/>
+      <circle cx="${cx+8}" cy="${cy-1}" r="1.4" fill="url(#gradMetal)"/>
+      <path d="M ${cx+8} ${cy-7} L ${cx+8} ${cy+5} M ${cx+2} ${cy-1} L ${cx+14} ${cy-1} M ${cx+3.8} ${cy-5.2} L ${cx+12.2} ${cy+3.2} M ${cx+3.8} ${cy+3.2} L ${cx+12.2} ${cy-5.2}" stroke-width="1.1"/>`;
+    case 'ssd': return `
+      <rect x="${cx-14}" y="${cy-9}" width="28" height="18" rx="2" fill="url(#gradMetal)"/>
+      <rect x="${cx-10}" y="${cy-5}" width="20" height="10" rx="1" fill="url(#gradDark)"/>
+      <line x1="${cx-7}" y1="${cy-1.5}" x2="${cx+2}" y2="${cy-1.5}" stroke="var(--accent)" stroke-width="1.2"/>
+      <line x1="${cx-7}" y1="${cy+1.5}" x2="${cx-1}" y2="${cy+1.5}" stroke="var(--accent)" stroke-width="1.2"/>
+      <circle cx="${cx-10}" cy="${cy-7}" r="1" fill="url(#gradDark)"/>
+      <circle cx="${cx+10}" cy="${cy-7}" r="1" fill="url(#gradDark)"/>`;
+    case 'fonte': return `
+      <rect x="${cx-14}" y="${cy-14}" width="28" height="28" rx="2" fill="url(#gradMetal)"/>
+      <circle cx="${cx}" cy="${cy}" r="9" fill="url(#gradDark)"/>
+      <path d="M ${cx} ${cy-9} L ${cx} ${cy+9} M ${cx-9} ${cy} L ${cx+9} ${cy} M ${cx-6.3} ${cy-6.3} L ${cx+6.3} ${cy+6.3} M ${cx-6.3} ${cy+6.3} L ${cx+6.3} ${cy-6.3}" stroke-width="1"/>
+      <circle cx="${cx}" cy="${cy}" r="2" fill="url(#gradMetal)"/>
+      <line x1="${cx-18}" y1="${cy+16}" x2="${cx-10}" y2="${cy+10}"/>
+      <rect x="${cx-21}" y="${cy+16}" width="5" height="4" rx="1" fill="url(#gradDark)"/>`;
+    case 'gabinete': return `
+      <rect x="${cx-11}" y="${cy-17}" width="22" height="34" rx="2" fill="url(#gradDark)"/>
+      <circle cx="${cx}" cy="${cy-12}" r="1.8" fill="url(#gradAccentGlow)"/>
+      <rect x="${cx+6.5}" y="${cy-17}" width="1.6" height="34" fill="url(#gradAccentGlow)"/>
+      ${[-6, 0, 6].map(yy => [-6, 0, 6].map(xx => `<circle cx="${cx+xx-2}" cy="${cy+yy+2}" r="0.9" fill="#0b0d10"/>`).join('')).join('')}`;
+    case 'water_cooler': return `
+      <rect x="${cx-16}" y="${cy-18}" width="32" height="11" rx="2" fill="url(#gradMetal)"/>
+      <line x1="${cx-12}" y1="${cy-15.5}" x2="${cx+12}" y2="${cy-15.5}" stroke-width="0.8"/>
+      <line x1="${cx-12}" y1="${cy-12.5}" x2="${cx+12}" y2="${cy-12.5}" stroke-width="0.8"/>
+      <path d="M ${cx-10} ${cy-7} C ${cx-14} ${cy}, ${cx-14} ${cy+4}, ${cx-9} ${cy+9}" fill="none" stroke="var(--ink-dim)" stroke-width="1.4"/>
+      <path d="M ${cx+10} ${cy-7} C ${cx+14} ${cy}, ${cx+14} ${cy+4}, ${cx+9} ${cy+9}" fill="none" stroke="var(--ink-dim)" stroke-width="1.4"/>
+      <circle cx="${cx}" cy="${cy+11}" r="9" fill="none"/>
+      <path d="M ${cx} ${cy+4} L ${cx} ${cy+18} M ${cx-9} ${cy+11} L ${cx+9} ${cy+11} M ${cx-6.3} ${cy+4.7} L ${cx+6.3} ${cy+17.3} M ${cx-6.3} ${cy+17.3} L ${cx+6.3} ${cy+4.7}" stroke-width="1"/>
+      <circle cx="${cx}" cy="${cy+11}" r="1.6" fill="url(#gradMetal)"/>`;
+    case 'monitor': return `
+      <rect x="${cx-16}" y="${cy-12}" width="32" height="20" rx="2" fill="url(#gradDark)"/>
+      <rect x="${cx-13}" y="${cy-9}" width="26" height="14" fill="#0b0d10"/>
+      <circle cx="${cx}" cy="${cy-10.3}" r="0.7" fill="var(--ink-dim)"/>
+      <line x1="${cx}" y1="${cy+8}" x2="${cx}" y2="${cy+14}" stroke-width="2.2"/>
+      <path d="M ${cx-9} ${cy+16} Q ${cx} ${cy+12} ${cx+9} ${cy+16}" fill="url(#gradMetal)"/>`;
+    default: return '';
+  }
+}
+
+const CASE_CENTRO = { x: 460, y: 210 };
+const ATRASO_BASE_MONTAGEM_MS = 380; // tempo pro gabinete "abrir" antes das peças saírem voando
+
+function diagramaPcSVG(slots) {
+  const porCategoria = {};
+  slots.forEach(s => { porCategoria[s.categoria] = s; });
+
+  const grupos = ORDEM_CATEGORIAS_DIAGRAMA.map((cat, indice) => {
+    const slot = porCategoria[cat];
+    if (!slot) return '';
+    const pos = LAYOUT_DIAGRAMA[cat];
+    const cheia = slot.preenchido ? ' cheia' : '';
+    const leaderX = pos.lado === 'esq' ? pos.cx + 26 : pos.cx - 26;
+    const labelX = pos.lado === 'esq' ? pos.cx + 36 : pos.cx - 36;
+    const dotX = pos.lado === 'esq' ? pos.cx + 30 : pos.cx - 30;
+    const anchor = pos.lado === 'esq' ? 'start' : 'end';
+    const rotuloEscapado = slot.rotulo.replace(/'/g, "\\'");
+    // vetor da peça ATÉ o centro do gabinete -- a peça nasce em cima do
+    // gabinete fechado e sai voando até o lugar dela quando ele "abre".
+    const dx = CASE_CENTRO.x - pos.cx;
+    const dy = CASE_CENTRO.y - pos.cy;
+    const estilo = `--dx:${dx}px; --dy:${dy}px; animation-delay:${ATRASO_BASE_MONTAGEM_MS + indice * 65}ms;`;
+    return `
+      <g class="peca-grupo montando${cheia}" data-cat="${cat}" style="${estilo}"
+         onclick="dispararPeca(this, '${cat}', '${rotuloEscapado}')">
+        <path class="peca-leader" d="M ${leaderX} ${pos.cy} L ${pos.ax} ${pos.ay}" />
+        <rect class="peca-chip-fundo" x="${pos.cx-26}" y="${pos.cy-26}" width="52" height="52" rx="10" />
+        <g class="peca-icone">${iconeParte(cat, pos.cx, pos.cy)}</g>
+        <circle class="peca-dot" cx="${dotX}" cy="${pos.cy}" r="4" />
+        <text class="peca-rotulo" x="${labelX}" y="${pos.cy + 4}" text-anchor="${anchor}">${slot.rotulo}</text>
+      </g>`;
+  }).join('');
+
+  const malha = [];
+  for (let fy = 70; fy <= 330; fy += 26) {
+    for (let fx = 405; fx <= 515; fx += 18) {
+      malha.push(`<circle cx="${fx}" cy="${fy}" r="2" fill="var(--bg)" opacity=".55"/>`);
+    }
+  }
+
+  return `
+    <svg viewBox="0 0 920 440" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="gradMetal" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#e2e6ea"/>
+          <stop offset="55%" stop-color="#aab2bd"/>
+          <stop offset="100%" stop-color="#737b88"/>
+        </linearGradient>
+        <linearGradient id="gradPcb" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#2f8a56"/>
+          <stop offset="100%" stop-color="#1b4d31"/>
+        </linearGradient>
+        <linearGradient id="gradGold" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#ffe28a"/>
+          <stop offset="100%" stop-color="#d9a441"/>
+        </linearGradient>
+        <linearGradient id="gradDark" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#454b54"/>
+          <stop offset="100%" stop-color="#1c1f24"/>
+        </linearGradient>
+        <linearGradient id="gradAccentGlow" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#ffb703"/>
+          <stop offset="100%" stop-color="#ff6b3d"/>
+        </linearGradient>
+      </defs>
+      <rect class="peca-case-flash" x="380" y="30" width="160" height="360" rx="18" />
+      <rect class="peca-case" x="380" y="30" width="160" height="360" rx="18" />
+      ${malha.join('')}
+      <rect x="380" y="30" width="6" height="360" fill="url(#gradAccentGlow)" opacity=".8"/>
+      <circle cx="460" cy="355" r="7" fill="none" class="peca-case-grade"/>
+      <circle cx="460" cy="355" r="3" fill="var(--ink-dim)"/>
+      ${grupos}
+    </svg>`;
+}
+
+function renderizarMontagem(dados) {
+  const cont = document.getElementById('montar-conteudo');
+  if (!dados) {
+    cont.innerHTML = '<p class="vazio-build">Esse PC não foi encontrado.</p>';
+    return;
+  }
+
+  const slotsHtml = dados.slots.map(s => {
+    const rotuloEscapado = s.rotulo.replace(/'/g, "\\'");
+    return `
+    <div class="slot-card ${s.preenchido ? 'preenchido' : ''}">
+      <div>
+        <p class="slot-rotulo">${s.rotulo}</p>
+        ${s.preenchido
+          ? `<p class="slot-item">${esc(s.item.titulo)} — <span class="price">${formatarPreco(s.item.preco)}</span> na ${esc(s.item.loja)}</p>`
+          : `<p class="slot-vazio">Nenhuma peça selecionada.</p>`}
+      </div>
+      <div class="card-actions">
+        <button class="btn btn-sm btn-primary" onclick="abrirModalSlot('${s.categoria}','${rotuloEscapado}')">Selecionar peça</button>
+        ${s.preenchido ? `<button class="btn btn-sm btn-danger" onclick="removerPecaSlot('${s.categoria}')">Remover</button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  let variacaoHtml = '';
+  let estiloTotal = '';
+  if (dados.variacao && dados.preenchidos > 0) {
+    if (dados.variacao.status === 'verde') { variacaoHtml = '▼ mais barato que da última vez'; estiloTotal = 'color: var(--good);'; }
+    else if (dados.variacao.status === 'vermelho') { variacaoHtml = '▲ mais caro que da última vez'; estiloTotal = 'color: var(--bad);'; }
+  }
+  const faltando = dados.total_slots - dados.preenchidos;
+
+  cont.innerHTML = `
+    <div class="diagrama-wrap">${diagramaPcSVG(dados.slots)}</div>
+    <div id="compat-painel"></div>
+    <div class="slots">${slotsHtml}</div>
+    <div class="rodape-build">
+      <div class="rodape-info">
+        <p class="rodape-sub">${dados.preenchidos}/${dados.total_slots} peças selecionadas${faltando ? '  ·  faltam ' + faltando : '  ·  completo!'}</p>
+        <p class="rodape-total" style="${estiloTotal}">${formatarPreco(dados.total)}</p>
+        ${variacaoHtml ? `<p class="rodape-sub" style="${estiloTotal}">${variacaoHtml}</p>` : ''}
+        <p class="rodape-sub" id="recalculo-status"></p>
+      </div>
+      <div class="card-actions">
+        <button class="btn btn-sm" id="btn-recalcular-build">🔄 Recalcular preços de todas as peças</button>
+        <button class="btn btn-primary btn-sm" id="btn-finalizar-build">✅ Finalizar / Recalcular orçamento</button>
+      </div>
+    </div>`;
+
+  document.getElementById('btn-recalcular-build').addEventListener('click', recalcularBuild);
+  document.getElementById('btn-finalizar-build').addEventListener('click', () => finalizarBuild(dados.total, dados.preenchidos));
+
+  checarCompatBuild();
+}
+
+async function carregarBuilds(selecionarId) {
+  buildsCache = await window.pywebview.api.listar_builds();
+  const select = document.getElementById('select-build');
+  if (!buildsCache.length) {
+    select.innerHTML = '';
+    buildAtualId = null;
+    document.getElementById('montar-conteudo').innerHTML =
+      '<p class="vazio-build">Crie um PC pra começar a montar ("➕ Novo PC").</p>';
+    return;
+  }
+  select.innerHTML = buildsCache.map(b => `<option value="${b.id}">${b.nome}</option>`).join('');
+  const alvo = (selecionarId && buildsCache.some(b => b.id === selecionarId)) ? selecionarId : buildsCache[0].id;
+  select.value = alvo;
+  await abrirBuild(alvo);
+}
+
+async function abrirBuild(buildId) {
+  buildAtualId = buildId;
+  const dados = await window.pywebview.api.obter_build_completo(buildId);
+  renderizarMontagem(dados);
+}
+
+document.getElementById('select-build').addEventListener('change', (e) => abrirBuild(parseInt(e.target.value, 10)));
+
+document.getElementById('btn-novo-build').addEventListener('click', async () => {
+  const nome = prompt('Nome para este PC (ex: "Setup Black Friday"):');
+  if (!nome) return;
+  const id = await window.pywebview.api.criar_build(nome);
+  await carregarBuilds(id);
+});
+
+document.getElementById('btn-excluir-build').addEventListener('click', async () => {
+  if (!buildAtualId) return;
+  if (!confirm('Excluir este PC e seus itens?')) return;
+  await window.pywebview.api.remover_build(buildAtualId);
+  await carregarBuilds();
+});
+
+async function abrirGraficoBuild() {
+  if (!buildAtualId) return;
+  const dados = await window.pywebview.api.obter_grafico_build(buildAtualId);
+  if (!dados) return;
+  document.getElementById('grafico-build-titulo').textContent = 'Histórico — ' + dados.nome;
+
+  let html = '<p class="titulo-secao-grafico">Evolução do total salvo</p>';
+  if (dados.totais.length >= 2) {
+    html += `<div class="grafico-historico">${graficoHistoricoSVG(dados.totais.map(t => ({data: t.data, preco: t.total})))}</div>`;
+  } else {
+    html += '<p class="store">Salve pelo menos dois orçamentos com preços diferentes (botão “Finalizar / Recalcular orçamento”) pra ver a evolução do total aqui.</p>';
+  }
+
+  html += '<p class="titulo-secao-grafico" style="margin-top:10px;">Variação de preço por peça (desde a busca anterior)</p>';
+  if (!dados.pecas.length) {
+    html += '<p class="store">Ainda não há duas checagens de preço pra comparar peça por peça. Use “🔄 Recalcular preços de todas as peças” de novo daqui a um tempo pra esse gráfico aparecer.</p>';
+  } else {
+    const pecas = dados.pecas;
+    const maisBarata = pecas[0].diferenca < -0.01 ? pecas[0] : null;
+    const maisCara = pecas[pecas.length - 1].diferenca > 0.01 ? pecas[pecas.length - 1] : null;
+    const resumo = [];
+    if (maisBarata) resumo.push(`🔻 Mais barata: ${esc(maisBarata.rotulo)} (-${formatarPreco(Math.abs(maisBarata.diferenca))})`);
+    if (maisCara) resumo.push(`🔺 Mais cara: ${esc(maisCara.rotulo)} (+${formatarPreco(maisCara.diferenca)})`);
+    html += `<p class="store">${resumo.length ? resumo.join('  ·  ') : 'Nenhuma peça mudou de preço desde a última checagem.'}</p>`;
+
+    const valores = pecas.map(p => p.diferenca);
+    const minV = Math.min(0, ...valores), maxV = Math.max(0, ...valores);
+    const span = (maxV - minV) || 1;
+    const zeroPct = -minV / span * 100;
+    html += '<div class="barras-variacao">' + pecas.map(p => {
+      const d = p.diferenca;
+      const esquerda = (Math.min(0, d) - minV) / span * 100;
+      const largura = Math.max(Math.abs(d) / span * 100, Math.abs(d) > 0.01 ? 1 : 0);
+      const textoValor = Math.abs(d) < 0.01 ? '—' : (d > 0 ? '+' : '-') + formatarPreco(Math.abs(d));
+      return `<div class="linha-barra">
+        <span class="rot" title="${esc(p.rotulo)}">${esc(p.rotulo)}</span>
+        <div class="trilho"><div class="zero" style="left:${zeroPct}%"></div><div class="barra ${p.status}" style="left:${esquerda}%; width:${largura}%"></div></div>
+        <span class="val ${p.status}">${textoValor}</span>
+      </div>`;
+    }).join('') + '</div>';
+  }
+
+  document.getElementById('grafico-build-corpo').innerHTML = html;
+  document.getElementById('modal-grafico-build').style.display = 'flex';
+}
+
+document.getElementById('btn-grafico-build').addEventListener('click', abrirGraficoBuild);
+document.getElementById('grafico-build-fechar').addEventListener('click', () => {
+  document.getElementById('modal-grafico-build').style.display = 'none';
+});
+
+function dispararPeca(grupo, categoria, rotulo) {
+  grupo.classList.remove('disparando');
+  void grupo.offsetWidth; // força reflow pra animação reiniciar mesmo clicando rápido várias vezes
+  grupo.classList.add('disparando');
+  setTimeout(() => abrirModalSlot(categoria, rotulo), 180);
+}
+
+async function abrirModalSlot(categoria, rotulo) {
+  modalSlotCategoria = categoria;
+  modalSlotSelecionado = null;
+  document.getElementById('modal-slot-titulo').textContent = 'Selecionar — ' + rotulo;
+  document.getElementById('modal-slot-status').textContent = 'Carregando...';
+  document.getElementById('modal-slot-lista').innerHTML = '';
+  document.getElementById('modal-slot').style.display = 'flex';
+
+  modalSlotProdutos = await window.pywebview.api.listar_produtos_para_slot(categoria);
+  document.getElementById('modal-slot-status').textContent = '';
+
+  if (!modalSlotProdutos.length) {
+    document.getElementById('modal-slot-lista').innerHTML =
+      `<p class="vazio">Você ainda não tem nenhum item em ${rotulo}. Busque um na tela "Buscar produto" primeiro.</p>`;
+    return;
+  }
+
+  document.getElementById('modal-slot-lista').innerHTML = modalSlotProdutos.map(p => `
+    <div class="modal-opcao" data-id="${p.id}">${esc(p.nome)}</div>
+  `).join('');
+  document.getElementById('modal-slot-lista').querySelectorAll('.modal-opcao').forEach(el => {
+    el.addEventListener('click', () => {
+      document.querySelectorAll('#modal-slot-lista .modal-opcao').forEach(o => o.classList.remove('selecionada'));
+      el.classList.add('selecionada');
+      modalSlotSelecionado = parseInt(el.dataset.id, 10);
+    });
+  });
+}
+
+document.getElementById('modal-slot-cancelar').addEventListener('click', () => {
+  document.getElementById('modal-slot').style.display = 'none';
+});
+
+document.getElementById('modal-slot-confirmar').addEventListener('click', async () => {
+  if (!modalSlotSelecionado) return;
+  document.getElementById('modal-slot-status').textContent = 'Buscando preço mais atual...';
+  await window.pywebview.api.selecionar_peca_slot(buildAtualId, modalSlotCategoria, modalSlotSelecionado);
+});
+
+function onPecaSelecionada(dados) {
+  document.getElementById('modal-slot').style.display = 'none';
+  if (dados.build_id === buildAtualId) abrirBuild(buildAtualId);
+}
+
+async function removerPecaSlot(categoria) {
+  await window.pywebview.api.remover_peca_slot(buildAtualId, categoria);
+  abrirBuild(buildAtualId);
+}
+
+async function recalcularBuild() {
+  await window.pywebview.api.recalcular_precos_build(buildAtualId);
+}
+
+function onProgressoRecalculo(dados) {
+  if (dados.build_id !== buildAtualId) return;
+  const el = document.getElementById('recalculo-status');
+  if (el) el.textContent = `Atualizando (${dados.atual}/${dados.total}): ${dados.nome}...`;
+}
+
+function onRecalculoConcluido(dados) {
+  if (dados.build_id === buildAtualId) abrirBuild(buildAtualId);
+}
+
+async function finalizarBuild(total, preenchidos) {
+  if (!preenchidos) { alert('Selecione ao menos uma peça antes de finalizar.'); return; }
+  await window.pywebview.api.finalizar_build(buildAtualId, total);
+  alert(`Total de ${formatarPreco(total)} salvo no histórico deste PC.`);
+  abrirBuild(buildAtualId);
+}
+
+async function checarCompatBuild() {
+  const painel = document.getElementById('compat-painel');
+  painel.innerHTML = '<p class="compat-checando">🔎 Checando compatibilidade entre as peças (estimativa da IA)...</p>';
+  const idAlvo = buildAtualId;
+  await window.pywebview.api.checar_compatibilidade_build(idAlvo);
+}
+
+function onCompatibilidadeResultado(dados) {
+  if (dados.build_id !== buildAtualId) return;
+  const painel = document.getElementById('compat-painel');
+  if (!painel) return;
+  if (!dados.aplica || !dados.avisos.length) { painel.innerHTML = ''; return; }
+  painel.innerHTML = `
+    <div class="compat-card">
+      <p class="compat-titulo">⚠️ Possível incompatibilidade (estimativa da IA — confira antes de comprar):</p>
+      ${dados.avisos.map(a => `<p>• ${a}</p>`).join('')}
+    </div>`;
+}
+
+// ================= Rotinas =================
+let rotinasCache = [];
+let rotinaEditandoId = null;
+let horariosEditando = [];
+let diasSelecionadosRotina = new Set();
+
+function renderizarListaRotinas(rotinas) {
+  const cont = document.getElementById('lista-rotinas');
+  if (!rotinas.length) {
+    cont.innerHTML = '<p class="vazio-rotinas">Nenhuma rotina cadastrada. Crie uma pra checar o preço de um PC automaticamente.</p>';
+    return;
+  }
+  cont.innerHTML = rotinas.map(r => {
+    const statusTexto = r.ativa ? '' : '  ·  inativa';
+    let alertaHtml = '';
+    if (r.alerta_email) {
+      const condicoes = [];
+      if (r.alerta_total_abaixo) condicoes.push(`total < ${formatarPreco(r.alerta_total_abaixo)}`);
+      if (r.alertar_menor_preco) condicoes.push('novo menor preço de alguma peça');
+      alertaHtml = `<p class="rotina-alerta">📧 avisa ${r.alerta_email}${condicoes.length ? ' se ' + condicoes.join(' ou ') : ''}</p>`;
+    }
+    const ultimaTexto = r.ultima_execucao ? `Última checagem: ${r.ultima_execucao}` : 'Ainda não rodou.';
+    return `
+      <div class="rotina-card ${r.ativa ? '' : 'inativa'}" data-id="${r.id}">
+        <div class="rotina-info">
+          <p class="rotina-alvo">${r.descricao_alvo}</p>
+          <p class="rotina-horario">⏰ ${r.descricao_horarios}  ·  ${r.descricao_recorrencia}${statusTexto}</p>
+          <p class="rotina-ultima">${ultimaTexto}</p>
+          ${alertaHtml}
+        </div>
+        <div class="card-actions">
+          <button class="btn btn-sm btn-primary" onclick="rodarRotinaAgora(${r.id})">▶ Rodar agora</button>
+          <button class="btn btn-sm" onclick="abrirDialogoRotina(${r.id})">✏️ Editar</button>
+          <button class="btn btn-sm" onclick="alternarRotina(${r.id}, ${!r.ativa})">${r.ativa ? 'Desativar' : 'Ativar'}</button>
+          <button class="btn btn-sm btn-danger" onclick="removerRotina(${r.id})">🗑️</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function carregarRotinas() {
+  const [tarefaOk, rotinas] = await Promise.all([
+    window.pywebview.api.tarefa_agendada_status(),
+    window.pywebview.api.listar_rotinas(),
+  ]);
+  rotinasCache = rotinas;
+  const statusEl = document.getElementById('status-tarefa-agendada');
+  if (tarefaOk) {
+    statusEl.textContent = '✅ Tarefa agendada do Windows ativa — as rotinas rodam mesmo com o app fechado.';
+    statusEl.className = 'status-tarefa ok';
+  } else {
+    statusEl.textContent = '⚠️ A tarefa agendada do Windows ainda não foi criada — crie uma rotina pra registrá-la. Enquanto isso, as rotinas só rodam com o app aberto.';
+    statusEl.className = 'status-tarefa aviso';
+  }
+  renderizarListaRotinas(rotinas);
+}
+
+async function rodarRotinaAgora(id) {
+  const card = document.querySelector(`.rotina-card[data-id="${id}"]`);
+  if (card) card.style.opacity = '0.6';
+  await window.pywebview.api.rodar_rotina_agora(id);
+}
+
+function onProgressoRotina(dados) {
+  const linha = document.querySelector(`.rotina-card[data-id="${dados.rotina_id}"] .rotina-ultima`);
+  if (linha) linha.textContent = `Checando: ${dados.nome}...`;
+}
+
+function onRotinaConcluida(dados) {
+  if (dados.avisos && dados.avisos.length) alert(dados.avisos.join('\n'));
+  carregarRotinas();
+}
+
+function onRotinaErro(dados) {
+  alert(dados.mensagem);
+  carregarRotinas();
+}
+
+async function alternarRotina(id, ativa) {
+  await window.pywebview.api.alternar_rotina(id, ativa);
+  carregarRotinas();
+}
+
+async function removerRotina(id) {
+  const rotina = rotinasCache.find(r => r.id === id);
+  const nomeAlvo = rotina ? rotina.descricao_alvo : 'essa rotina';
+  if (!confirm(`Remover a rotina de checagem de "${nomeAlvo}"?`)) return;
+  await window.pywebview.api.remover_rotina(id);
+  carregarRotinas();
+}
+
+async function abrirDialogoRotina(rotinaId) {
+  const rotina = rotinaId ? rotinasCache.find(r => r.id === rotinaId) : null;
+  const editando = !!rotina;
+  const [builds, cats, emailPadrao] = await Promise.all([
+    window.pywebview.api.listar_builds(),
+    window.pywebview.api.listar_categorias(),
+    window.pywebview.api.obter_email_alerta(),
+  ]);
+  const categoriasPc = cats.pc;
+
+  document.getElementById('rotina-modal-titulo').textContent = editando ? 'Editar rotina' : 'Nova rotina';
+  document.getElementById('rotina-modal-salvar').textContent = editando ? 'Salvar alterações' : 'Criar rotina';
+  document.getElementById('rotina-modal-status').textContent = '';
+  rotinaEditandoId = editando ? rotina.id : null;
+
+  const alvoTipoInicial = editando ? rotina.alvo_tipo : (builds.length ? 'build' : 'categoria');
+  horariosEditando = editando ? [...rotina.horarios] : ['09:00'];
+  const tipoRepeticaoInicial = !editando ? 'diaria' : (!rotina.repetir ? 'unica' : (rotina.dias_semana.length ? 'dias' : 'diaria'));
+  diasSelecionadosRotina = new Set(editando ? rotina.dias_semana : []);
+  const dataUnicaInicial = (() => {
+    if (editando && rotina.data_unica) {
+      const [ano, mes, dia] = rotina.data_unica.split('-');
+      return `${dia}/${mes}/${ano}`;
+    }
+    const amanha = new Date(Date.now() + 86400000);
+    return `${String(amanha.getDate()).padStart(2, '0')}/${String(amanha.getMonth() + 1).padStart(2, '0')}/${amanha.getFullYear()}`;
+  })();
+  const alertaAtivoInicial = editando ? !!rotina.alerta_email : true;
+  const emailInicial = (editando ? rotina.alerta_email : null) || emailPadrao || '';
+  const totalAtivoInicial = editando ? !!rotina.alerta_total_abaixo : true;
+  const totalValorInicial = (editando && rotina.alerta_total_abaixo) ? rotina.alerta_total_abaixo.toFixed(2) : '';
+  const menorPrecoInicial = editando ? !!rotina.alertar_menor_preco : true;
+
+  const corpo = document.getElementById('rotina-modal-corpo');
+  corpo.innerHTML = `
+    <p class="secao-form">O que verificar:</p>
+    <label class="linha-radio"><input type="radio" name="rotina-alvo" value="build" ${!builds.length ? 'disabled' : ''} ${alvoTipoInicial === 'build' ? 'checked' : ''}> Um PC montado</label>
+    <label class="linha-radio"><input type="radio" name="rotina-alvo" value="categoria" ${alvoTipoInicial === 'categoria' ? 'checked' : ''}> Uma categoria específica</label>
+    <label class="linha-radio"><input type="radio" name="rotina-alvo" value="tudo" ${alvoTipoInicial === 'tudo' ? 'checked' : ''}> Tudo o que está cadastrado</label>
+
+    <div class="sub-form" id="rotina-sub-build" style="display:none;">
+      ${builds.length
+        ? `<select class="select-form" id="rotina-select-build">${builds.map(b => `<option value="${b.id}" ${editando && rotina.build_id === b.id ? 'selected' : ''}>${b.nome}</option>`).join('')}</select>`
+        : `<p class="rotina-ultima">Crie um PC em "Montar PC" antes de escolher essa opção.</p>`}
+    </div>
+    <div class="sub-form" id="rotina-sub-categoria" style="display:none;">
+      <select class="select-form" id="rotina-select-categoria">${categoriasPc.map(c => `<option value="${c.chave}" ${editando && rotina.alvo_categoria === c.chave ? 'selected' : ''}>${c.rotulo}</option>`).join('')}</select>
+    </div>
+    <div class="sub-form" id="rotina-sub-tudo" style="display:none;">
+      <p class="rotina-ultima">Vai checar o preço de todos os produtos cadastrados, em qualquer categoria.</p>
+    </div>
+
+    <p class="secao-form">Horário(s) da checagem:</p>
+    <div id="rotina-lista-horarios"></div>
+    <div class="linha-add-horario">
+      <select class="select-form" id="rotina-hora">${Array.from({length: 24}, (_, h) => `<option ${h === 9 ? 'selected' : ''}>${String(h).padStart(2, '0')}</option>`).join('')}</select>
+      <span>:</span>
+      <select class="select-form" id="rotina-minuto">${Array.from({length: 12}, (_, i) => i * 5).map(m => `<option ${m === 0 ? 'selected' : ''}>${String(m).padStart(2, '0')}</option>`).join('')}</select>
+      <button class="btn btn-sm" onclick="adicionarHorarioRotina()">➕ Adicionar</button>
+    </div>
+
+    <p class="secao-form">Repetir:</p>
+    <label class="linha-radio"><input type="radio" name="rotina-repeticao" value="diaria" ${tipoRepeticaoInicial === 'diaria' ? 'checked' : ''}> Todo dia</label>
+    <label class="linha-radio"><input type="radio" name="rotina-repeticao" value="dias" ${tipoRepeticaoInicial === 'dias' ? 'checked' : ''}> Dias específicos da semana</label>
+    <label class="linha-radio"><input type="radio" name="rotina-repeticao" value="unica" ${tipoRepeticaoInicial === 'unica' ? 'checked' : ''}> Uma vez só</label>
+    <div class="dias-semana" id="rotina-dias-semana" style="display:none;"></div>
+    <div class="sub-form" id="rotina-sub-data" style="display:none;">
+      <span class="rotulo-config">Data (DD/MM/AAAA):</span>
+      <input type="text" class="input-pequeno" id="rotina-data-unica" value="${dataUnicaInicial}">
+    </div>
+
+    <label class="checkbox-linha" style="margin-top:10px;">
+      <input type="checkbox" id="rotina-alerta-ativo" ${alertaAtivoInicial ? 'checked' : ''}>
+      <span><strong>📧 Avisar por e-mail quando o preço cair</strong></span>
+    </label>
+    <div class="sub-form" id="rotina-detalhe-alerta" style="display:none;">
+      <span class="rotulo-config">E-mail para avisar:</span><br>
+      <input type="text" id="rotina-alerta-email" style="width:100%; margin:4px 0 8px;" value="${emailInicial}">
+      <div id="rotina-sub-total-alerta" style="display:none;">
+        <label class="checkbox-linha">
+          <input type="checkbox" id="rotina-alerta-total-ativo" ${totalAtivoInicial ? 'checked' : ''}>
+          <span>Total do PC ficar abaixo de: R$ <input type="text" class="input-pequeno" id="rotina-alerta-total-valor" value="${totalValorInicial}"></span>
+        </label>
+      </div>
+      <label class="checkbox-linha">
+        <input type="checkbox" id="rotina-alertar-menor-preco" ${menorPrecoInicial ? 'checked' : ''}>
+        <span>Algum item bater um novo menor preço histórico</span>
+      </label>
+    </div>
+  `;
+
+  const diasSemanaEl = document.getElementById('rotina-dias-semana');
+  const DIAS = [['seg', 'Seg'], ['ter', 'Ter'], ['qua', 'Qua'], ['qui', 'Qui'], ['sex', 'Sex'], ['sab', 'Sáb'], ['dom', 'Dom']];
+  diasSemanaEl.innerHTML = DIAS.map(([v, rot]) => `<div class="dia-chip ${diasSelecionadosRotina.has(v) ? 'ativo' : ''}" data-dia="${v}" onclick="alternarDiaRotina('${v}')">${rot}</div>`).join('');
+
+  redesenharHorariosRotina();
+
+  document.querySelectorAll('input[name="rotina-alvo"]').forEach(r => r.addEventListener('change', atualizarVisibilidadeAlvoRotina));
+  document.querySelectorAll('input[name="rotina-repeticao"]').forEach(r => r.addEventListener('change', atualizarVisibilidadeRepeticaoRotina));
+  document.getElementById('rotina-alerta-ativo').addEventListener('change', atualizarVisibilidadeAlertaRotina);
+
+  atualizarVisibilidadeAlvoRotina();
+  atualizarVisibilidadeRepeticaoRotina();
+  atualizarVisibilidadeAlertaRotina();
+
+  document.getElementById('modal-rotina').style.display = 'flex';
+}
+
+function atualizarVisibilidadeAlvoRotina() {
+  const tipo = document.querySelector('input[name="rotina-alvo"]:checked').value;
+  document.getElementById('rotina-sub-build').style.display = tipo === 'build' ? 'block' : 'none';
+  document.getElementById('rotina-sub-categoria').style.display = tipo === 'categoria' ? 'block' : 'none';
+  document.getElementById('rotina-sub-tudo').style.display = tipo === 'tudo' ? 'block' : 'none';
+  atualizarVisibilidadeAlertaTotalRotina();
+}
+
+function atualizarVisibilidadeRepeticaoRotina() {
+  const tipo = document.querySelector('input[name="rotina-repeticao"]:checked').value;
+  document.getElementById('rotina-dias-semana').style.display = tipo === 'dias' ? 'flex' : 'none';
+  document.getElementById('rotina-sub-data').style.display = tipo === 'unica' ? 'block' : 'none';
+}
+
+function atualizarVisibilidadeAlertaRotina() {
+  const ativo = document.getElementById('rotina-alerta-ativo').checked;
+  document.getElementById('rotina-detalhe-alerta').style.display = ativo ? 'block' : 'none';
+  atualizarVisibilidadeAlertaTotalRotina();
+}
+
+function atualizarVisibilidadeAlertaTotalRotina() {
+  const tipo = document.querySelector('input[name="rotina-alvo"]:checked').value;
+  const alertaAtivo = document.getElementById('rotina-alerta-ativo').checked;
+  document.getElementById('rotina-sub-total-alerta').style.display = (tipo === 'build' && alertaAtivo) ? 'block' : 'none';
+}
+
+function alternarDiaRotina(dia) {
+  if (diasSelecionadosRotina.has(dia)) diasSelecionadosRotina.delete(dia);
+  else diasSelecionadosRotina.add(dia);
+  document.querySelector(`.dia-chip[data-dia="${dia}"]`).classList.toggle('ativo');
+}
+
+function redesenharHorariosRotina() {
+  const cont = document.getElementById('rotina-lista-horarios');
+  if (!horariosEditando.length) {
+    cont.innerHTML = '<p class="rotina-ultima">Nenhum horário adicionado ainda.</p>';
+    return;
+  }
+  cont.innerHTML = [...horariosEditando].sort().map(h => `
+    <div class="linha-horario"><span>⏰ ${h}</span><button onclick="removerHorarioRotina('${h}')">✕</button></div>
+  `).join('');
+}
+
+function adicionarHorarioRotina() {
+  const h = document.getElementById('rotina-hora').value;
+  const m = document.getElementById('rotina-minuto').value;
+  const novo = `${h}:${m}`;
+  if (!horariosEditando.includes(novo)) horariosEditando.push(novo);
+  redesenharHorariosRotina();
+}
+
+function removerHorarioRotina(h) {
+  horariosEditando = horariosEditando.filter(x => x !== h);
+  redesenharHorariosRotina();
+}
+
+document.getElementById('rotina-modal-cancelar').addEventListener('click', () => {
+  document.getElementById('modal-rotina').style.display = 'none';
+});
+document.getElementById('btn-nova-rotina').addEventListener('click', () => abrirDialogoRotina(null));
+
+document.getElementById('rotina-modal-salvar').addEventListener('click', async () => {
+  const tipoAlvo = document.querySelector('input[name="rotina-alvo"]:checked').value;
+  const campoBuild = document.getElementById('rotina-select-build');
+  const dados = {
+    id: rotinaEditandoId,
+    alvo_tipo: tipoAlvo,
+    build_id: (tipoAlvo === 'build' && campoBuild) ? parseInt(campoBuild.value, 10) : null,
+    alvo_categoria: tipoAlvo === 'categoria' ? document.getElementById('rotina-select-categoria').value : null,
+    horarios: horariosEditando,
+    tipo_repeticao: document.querySelector('input[name="rotina-repeticao"]:checked').value,
+    dias_semana: [...diasSelecionadosRotina],
+    data_unica: document.getElementById('rotina-data-unica').value,
+    alerta_ativo: document.getElementById('rotina-alerta-ativo').checked,
+    alerta_email: document.getElementById('rotina-alerta-email').value,
+    alerta_total_ativo: document.getElementById('rotina-alerta-total-ativo').checked,
+    alerta_total_valor: document.getElementById('rotina-alerta-total-valor').value,
+    alertar_menor_preco: document.getElementById('rotina-alertar-menor-preco').checked,
+  };
+  const resultado = await window.pywebview.api.salvar_rotina(dados);
+  if (!resultado.ok) {
+    document.getElementById('rotina-modal-status').textContent = resultado.erro;
+    return;
+  }
+  document.getElementById('modal-rotina').style.display = 'none';
+  if (resultado.avisos && resultado.avisos.length) alert(resultado.avisos.join('\n\n'));
+  carregarRotinas();
+});
+
+// ================= Configurações =================
+async function carregarConfiguracoes() {
+  const email = await window.pywebview.api.obter_email_alerta();
+  document.getElementById('input-email-alerta').value = email || '';
+  document.getElementById('status-email-alerta').textContent = '';
+
+  const opcoes = await window.pywebview.api.listar_opcoes_exportacao();
+  document.getElementById('select-exportar').innerHTML = opcoes.map(o => `<option value="${o.chave}">${o.rotulo}</option>`).join('');
+  document.getElementById('status-exportar').textContent = '';
+  document.getElementById('status-importar').textContent = '';
+}
+
+document.getElementById('btn-salvar-email-alerta').addEventListener('click', async () => {
+  const email = document.getElementById('input-email-alerta').value;
+  const resultado = await window.pywebview.api.definir_email_alerta(email);
+  const status = document.getElementById('status-email-alerta');
+  if (!resultado.ok) { status.textContent = resultado.erro; return; }
+  status.textContent = resultado.aviso || 'E-mail padrão de alertas atualizado.';
+});
+
+document.getElementById('btn-exportar').addEventListener('click', async () => {
+  const chave = document.getElementById('select-exportar').value;
+  const status = document.getElementById('status-exportar');
+  status.textContent = 'Aguardando local do arquivo...';
+  const resultado = await window.pywebview.api.exportar_dados(chave);
+  if (resultado.cancelado) { status.textContent = ''; return; }
+  if (!resultado.ok) { status.textContent = 'Erro: ' + resultado.erro; return; }
+  status.textContent = `${resultado.resumo} Salvo em: ${resultado.caminho}`;
+});
+
+document.getElementById('btn-importar').addEventListener('click', async () => {
+  const status = document.getElementById('status-importar');
+  status.textContent = 'Aguardando seleção do arquivo...';
+  const resultado = await window.pywebview.api.escolher_arquivo_importacao();
+  if (resultado.cancelado) { status.textContent = ''; return; }
+  if (!resultado.ok) { status.textContent = 'Erro: ' + resultado.erro; return; }
+  document.getElementById('importar-modal-resumo').textContent = `O arquivo tem ${resultado.resumo}.`;
+  document.querySelector('input[name="modo-importar"][value="somar"]').checked = true;
+  document.getElementById('modal-importar').style.display = 'flex';
+  status.textContent = '';
+});
+
+document.getElementById('importar-modal-cancelar').addEventListener('click', () => {
+  document.getElementById('modal-importar').style.display = 'none';
+});
+
+document.getElementById('importar-modal-confirmar').addEventListener('click', async () => {
+  const modo = document.querySelector('input[name="modo-importar"]:checked').value;
+  if (modo === 'substituir' && !confirm('Tem certeza? Isso vai apagar TUDO que você tem cadastrado agora e não tem como desfazer.')) {
+    return;
+  }
+  const resultado = await window.pywebview.api.confirmar_importacao(modo === 'substituir');
+  document.getElementById('modal-importar').style.display = 'none';
+  const status = document.getElementById('status-importar');
+  if (!resultado.ok) { status.textContent = 'Erro: ' + resultado.erro; return; }
+  status.textContent = `${resultado.novos_produtos} produto(s) e ${resultado.novos_builds} PC(s) montado(s) importados com sucesso.`;
+});
+
+let tentativasInicio = 0;
+let appIniciado = false;
+async function iniciarApp() {
+  if (appIniciado) return;
+  appIniciado = true;
+  await carregarSidebar();
+  try {
+    document.getElementById('versao-app').textContent = 'v' + await window.pywebview.api.versao_app();
+  } catch (e) { /* só enfeite */ }
+  setTimeout(checarAtualizacao, 3000);
+}
+
+function iniciarQuandoPronto() {
+  tentativasInicio++;
+  if (window.pywebview && window.pywebview.api && typeof window.pywebview.api.listar_categorias === 'function') {
+    iniciarApp();
+  } else if (tentativasInicio < 100) {
+    setTimeout(iniciarQuandoPronto, 100);
+  } else {
+    document.getElementById('lista-categorias').innerHTML =
+      '<div style="color:#ff6b6b; font-size:11px; padding:8px;">window.pywebview nunca ficou pronto</div>';
+  }
+}
+window.addEventListener('pywebviewready', iniciarQuandoPronto);
+iniciarQuandoPronto();
+</script>
+</body>
+</html>
